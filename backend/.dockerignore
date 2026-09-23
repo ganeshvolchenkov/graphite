@@ -1,0 +1,20 @@
+# The venv is gigabytes and platform-specific; .env must never enter an image.
+venv/
+.venv/
+__pycache__/
+**/__pycache__/
+*.pyc
+.env
+*.log
+.uvicorn*
+.tunnel*
+
+# Local scratch and dev-only scripts.
+ecb*.json
+test_*.py
+smoke_test.py
+probe_usage.py
+share.ps1
+
+.git/
+.gitignore
