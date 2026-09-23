@@ -56,6 +56,15 @@ def health_check():
     return {"status": "ok", "engine": "Nebius Token Factory Ready"}
 
 
+@app.get("/health/sandbox")
+def sandbox_check() -> dict:
+    """Does strategy execution actually work on this host? Check it after every
+    deploy — a serverless runtime that blocks subprocesses breaks the product."""
+    from engine.sandbox import self_check
+
+    return self_check()
+
+
 @app.get("/dashboard", include_in_schema=False)
 def dashboard() -> FileResponse:
     return FileResponse(STATIC / "dashboard.html", media_type="text/html")

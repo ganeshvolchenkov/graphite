@@ -1,0 +1,21 @@
+# The venv is gigabytes and platform-specific; .env belongs in Vercel's
+# Environment Variables, never in an upload.
+venv/
+.venv/
+__pycache__/
+**/__pycache__/
+*.pyc
+.env
+*.log
+.uvicorn*
+.tunnel*
+
+# Local scratch and dev-only tooling.
+ecb*.json
+test_*.py
+smoke_test.py
+probe_usage.py
+share.ps1
+Dockerfile
+.dockerignore
+fly.toml

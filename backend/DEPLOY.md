@@ -1,67 +1,77 @@
-# Deploying the StressTest API
-
-The deployable unit is `Dockerfile`. It is plain Docker with no host-specific
-anything, so it runs on Fly.io, Cloud Run, Railway, Hugging Face Spaces or a VPS.
-Nothing below is hard to undo, and moving host later costs one command.
-
-Verified locally before writing this:
-
-```
-docker build -t stresstest:test .
-docker run -d -p 8099:8080 -e STRESSTEST_API_KEY=... stresstest:test
-```
-
-| check | result |
-|---|---|
-| image builds | yes, `python:3.11-slim` |
-| runs as | `appuser`, uid 10001, not root |
-| `/app` writable | no — `touch` denied |
-| `/api` without key | `401` |
-| `/api` with key | `200` |
-| sandbox in container | 220 ticks, no error |
-| numpy inside a strategy | runs clean |
-
-## Fly.io (recommended)
-
-Deploys from this directory, so it needs no GitHub access — which matters here,
-because the git credentials on this machine belong to a different account.
+# Deploying the StressTest API on Vercel
 
 ```bash
-fly auth login                                   # browser
-fly launch --copy-config --no-deploy             # claims the app name, keeps fly.toml
-fly secrets set NEBIUS_API_KEY=xxx STRESSTEST_API_KEY=yyy
-fly deploy --remote-only                         # builds on Fly, no local Docker needed
+vercel login
+vercel link          # from backend/ — set Root Directory to backend
+vercel env add NEBIUS_API_KEY production
+vercel env add STRESSTEST_API_KEY production
+vercel --prod
 ```
 
-Then:
+`vercel.json` rewrites every path to `api/index.py`, which imports the same
+FastAPI app that runs under uvicorn locally. Nothing about the app changed.
+
+**This is a monorepo, so Root Directory must be `backend`.** If Vercel builds
+from the repo root it will find the Next.js frontend instead and the API will
+404 on everything.
+
+## Check these three things the moment it deploys
+
+Vercel is serverless, and the app was built for a long-lived process. Three
+things can break, all of them in the first minute, all of them checkable.
+
+### 1. Does the sandbox still work? — the one that matters
+
+The product executes strategy code in a subprocess. Some serverless runtimes do
+not allow spawning one, and if this fails, nothing else matters.
 
 ```bash
-fly status          # should show 1 machine running
-fly logs
-fly open /dashboard
+curl https://<app>.vercel.app/health/sandbox
 ```
 
-The URL is `https://<app-name>.fly.dev` and it does not change between deploys.
+```json
+{"subprocess": true, "ticks": 3, "fills": 3, "executable": "...", "error": null}
+```
 
-`fly.toml` sets `auto_stop_machines = 'off'` and `min_machines_running = 1`, so it
-never scales to zero and never cold-starts in front of a judge. That is the whole
-reason for choosing this over a free tier that sleeps.
+`"subprocess": true` means strategy execution works. If it is `false`, read
+`error` — and the answer is to move the API to a host that runs a real container
+(the previous commit has a working Dockerfile in its history). Do not try to
+patch around it by running strategy code in the API process: an infinite loop
+would then hang the function instead of hitting the 8s worker timeout, and the
+process holding `NEBIUS_API_KEY` would be the one running untrusted code.
 
-**Cost:** one `shared-cpu-1x` / 1GB machine runs about $5/month. Not free. If it
-must be $0, see Cloud Run below and accept a cold start.
+### 2. Does the tick stream still stream?
 
-## Google Cloud Run (the $0 option)
-
-Generous always-free tier, but it scales to zero, so the first request after idle
-waits 2–5 seconds while the container starts.
+Serverless proxies sometimes buffer a response until it closes, which turns the
+live chart into a single jump at the end.
 
 ```bash
-gcloud run deploy stresstest \
-  --source . --region europe-west4 --allow-unauthenticated \
-  --set-env-vars STRESSTEST_API_KEY=yyy --set-env-vars NEBIUS_API_KEY=xxx
+curl -N -H "X-API-Key: <key>" -H "Content-Type: application/json" \
+  -d @- https://<app>.vercel.app/api/simulations <<'JSON'
+{"strategy":{"name":"t","code":"def on_tick(bar, book, account):\n    account.buy(1)\n"},
+ "scenario":{"id":"c","name":"t","params":{"shockMagnitudePct":-8,"volatilityMultiplier":5,
+ "liquidityFactor":0.1,"spreadBps":40,"gapPct":0,"durationMinutes":20,
+ "shockDurationMinutes":5,"recoveryMinutes":5}},"variant":"original"}
+JSON
 ```
 
-Add `--min-instances 1` to stop the cold starts; that costs roughly the same as Fly.
+Ticks should appear gradually over several seconds. If they all land at once,
+point the frontend at `POST /api/simulations/sync` instead — same
+`SimulationRun` payload, no streaming — and drop the live animation.
+
+### 3. Is the plan's timeout long enough?
+
+`vercel.json` asks for `maxDuration: 300`. **Hobby caps at 60s**; 300s needs Pro.
+A run that generates an adapter and then simulates can take 30–60s, so on Hobby
+it is genuinely close to the limit. Confirm the plan, and if it is Hobby, either
+upgrade or lower `maxDuration` to 60 and expect occasional timeouts on the
+slowest institutional prompts.
+
+## Cold starts
+
+Serverless scales to zero, so the first request after idle pays for a container
+start plus a numpy import — a few seconds. The URL is permanent and never dies,
+but it is not always-warm. Before judging, hit `/health` once to warm it.
 
 ## Environment variables
 
@@ -69,34 +79,33 @@ Add `--min-instances 1` to stop the cold starts; that costs roughly the same as 
 |---|---|---|
 | `NEBIUS_API_KEY` | yes | backend → Nebius model inference |
 | `STRESSTEST_API_KEY` | on any public URL | frontend → this API, via `X-API-Key` |
-| `PORT` | no | injected by the host; defaults to 8080 |
 
 With `STRESSTEST_API_KEY` unset the `/api` routes are **open** and the app logs a
-warning at startup. That is deliberate — local dev needs no key and a host missing
-the variable should still demo rather than 401 everything — but anything reachable
-from the internet must set it.
+warning at startup. Local dev needs no key; anything public must set one.
 
-Never bake either key into the image. `.env` is in `.dockerignore` and `.gitignore`.
+Set both for the Production environment. Never commit either — `.env` is in
+`.gitignore` and `.vercelignore`.
+
+## Bundle size
+
+Measured at **67.6 MB** installed (numpy 34.6, openai 14.7, pydantic 9.4, the
+rest small) against Vercel's 250 MB limit. Not a concern, but `numpy` cannot be
+dropped — strategy code is allowed to import it.
 
 ## After deploying
 
-Send the frontend two values, and nothing else:
+Send the frontend two values and nothing else:
 
 ```
-Backend URL : https://<app-name>.fly.dev
+Backend URL : https://<app>.vercel.app
 API key     : <STRESSTEST_API_KEY>
 ```
 
 Both are settings fields in the frontend, so a redeploy is a paste, not a rebuild.
 
-Confirm it end to end:
-
 ```bash
-curl https://<app>.fly.dev/health
-curl -H "X-API-Key: <key>" https://<app>.fly.dev/api/runs
-curl https://<app>.fly.dev/api/runs        # expect 401
+curl https://<app>.vercel.app/health
+curl https://<app>.vercel.app/health/sandbox
+curl https://<app>.vercel.app/api/runs                      # expect 401
+curl -H "X-API-Key: <key>" https://<app>.vercel.app/api/runs  # expect 200
 ```
-
-Then check the streaming endpoint actually streams rather than buffering — some
-proxies hold the response until it closes, which kills the live chart. If ticks
-arrive in one clump, switch the frontend to `POST /api/simulations/sync`.

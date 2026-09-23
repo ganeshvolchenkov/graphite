@@ -22,6 +22,37 @@ class ExecutionResult:
         return bool(self.ticks) and self.error is None and not self.timed_out
 
 
+def self_check() -> dict:
+    """Run a trivial strategy end to end and report whether this host allows it.
+
+    Serverless runtimes do not always let a function spawn a process, and the
+    whole product depends on that working. Finding out from a health check right
+    after deploying is recoverable; finding out mid-demo is not.
+    """
+    rows = [
+        {
+            "index": i, "t_ms": i * 1000, "clock": f"09:30:0{i}", "phase": "warmup",
+            "price": 100.0, "bid": 99.99, "ask": 100.01,
+            "spread_bps": 2.0, "spread_pips": 1.0,
+            "bids": [{"price": 99.99, "size": 100.0}], "asks": [{"price": 100.01, "size": 100.0}],
+            "depth_bid": 100.0, "depth_ask": 100.0, "imbalance": 0.0,
+            "liquidity_pct": 100.0, "volatility_pct": 1.0,
+            "stale": False, "halted": False, "crossed": False,
+            "toxic": 0.0, "toxic_direction": "sell", "atr": 0.01,
+            "rolling_high": 100.0, "rolling_low": 100.0,
+        }
+        for i in range(3)
+    ]
+    result = run_strategy("def on_tick(bar, book, account):\n    account.buy(1)\n", rows)
+    return {
+        "subprocess": result.error is None and bool(result.ticks),
+        "ticks": len(result.ticks),
+        "fills": len(result.fills),
+        "executable": sys.executable,
+        "error": result.error,
+    }
+
+
 def run_strategy(code: str, rows: list[dict]) -> ExecutionResult:
     """Execute the strategy in a separate process with a hard wall-clock limit.
 
