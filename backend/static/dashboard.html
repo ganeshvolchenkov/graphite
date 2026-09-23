@@ -182,7 +182,7 @@
   </div>
   <div style="min-width:150px">
     <label for="apikey">API key</label>
-    <input type="password" id="apikey" value="" placeholder="only if server sets one" autocomplete="off">
+    <input type="password" id="apikey" value="" placeholder="required by this server" autocomplete="off">
   </div>
   <div>
     <label for="mock">Mode</label>
@@ -197,6 +197,12 @@
     <button class="ghost tiny" id="theme">Toggle</button>
   </div>
 </header>
+
+<div id="authbanner" hidden style="margin:14px 0;padding:12px 16px;border-radius:8px;
+     border:1px solid #b3801e;background:rgba(179,128,30,.12);font-size:14px;line-height:1.5">
+  <strong>This server requires an API key.</strong>
+  Paste it into the <em>API key</em> box above, or every request below will return 401.
+</div>
 
 <!-- STEP 1 -->
 <section class="card">
@@ -559,7 +565,19 @@ $("base").value = location.origin;
 try { $("apikey").value = localStorage.getItem("stresstest-api-key") || ""; } catch (e) {}
 $("apikey").addEventListener("change", () => {
   try { localStorage.setItem("stresstest-api-key", $("apikey").value.trim()); } catch (e) {}
+  refreshAuthBanner();
 });
+
+/* Say so up front rather than letting every button fail with a bare 401. */
+async function refreshAuthBanner() {
+  try {
+    const health = await (await fetch(base() + "/health")).json();
+    $("authbanner").hidden = !(health.authRequired && !$("apikey").value.trim());
+  } catch (e) {
+    $("authbanner").hidden = true;
+  }
+}
+refreshAuthBanner();
 const base = () => $("base").value.replace(/\/$/, "");
 const mock = () => $("mock").value === "true";
 const qs = () => (mock() ? "?use_mock=true" : "");
@@ -584,6 +602,12 @@ async function call(path, options, metaId) {
   opts.headers = authed(opts.headers);
   const res = await fetch(base() + path, opts);
   const ms = performance.now() - t0;
+  if (res.status === 401) {
+    refreshAuthBanner();
+    throw new Error(apiKey()
+      ? "401 — that API key is not accepted by this server."
+      : "401 — this server needs an API key. Paste it in the API key box above.");
+  }
   if (!res.ok) throw new Error(`${res.status} ${res.statusText} — ${(await res.text()).slice(0, 220)}`);
   const json = await res.json();
   console.log(path, json);
@@ -803,6 +827,7 @@ $("btn-sim").onclick = async () => {
     const streamOpts = postJSON({ strategy: { name: "console_strategy", code: $("code").value }, scenario: scenarioPayload(), variant: "original" });
     streamOpts.headers = authed(streamOpts.headers);
     const res = await fetch(`${base()}/api/simulations?tick_delay_ms=${$("speed").value}`, streamOpts);
+    if (res.status === 401) { refreshAuthBanner(); throw new Error("401 — check the API key box above."); }
     if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
     const reader = res.body.getReader(), dec = new TextDecoder();
     let buf = "", frames = 0;

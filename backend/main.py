@@ -53,7 +53,13 @@ def index() -> RedirectResponse:
 
 @app.get("/health")
 def health_check():
-    return {"status": "ok", "engine": "Nebius Token Factory Ready"}
+    # authRequired lets a client tell "I forgot the key" apart from "the key is
+    # wrong" before it makes a single /api call.
+    return {
+        "status": "ok",
+        "engine": "Nebius Token Factory Ready",
+        "authRequired": auth.configured_key() is not None,
+    }
 
 
 @app.get("/health/sandbox")
