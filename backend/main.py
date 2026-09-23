@@ -7,6 +7,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, RedirectResponse
 
+import auth
 from mock_data import MOCK_RESPONSE
 from routers import audits, benchmark, runs, scenarios, simulations, strategies
 from schemas import BacktestRequest, BacktestResponse
@@ -17,14 +18,21 @@ logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(messag
 
 app = FastAPI(title="StressTest API")
 
+# Order matters: the last middleware added is the outermost, and CORS has to
+# wrap the auth check so a 401 still carries the CORS headers. Without that the
+# browser reports an opaque CORS failure instead of "your key is wrong".
+app.middleware("http")(auth.require_api_key)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["GET", "POST", "OPTIONS"],
-    allow_headers=["Content-Type", "Authorization", "Cache-Control"],
+    allow_headers=["Content-Type", "Authorization", "Cache-Control", auth.HEADER],
     expose_headers=["Content-Type"],
 )
+
+auth.log_status()
 
 app.include_router(scenarios.router)
 app.include_router(simulations.router)

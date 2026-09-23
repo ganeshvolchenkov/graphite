@@ -180,6 +180,10 @@
     <label for="base">Backend</label>
     <input type="text" id="base" value="">
   </div>
+  <div style="min-width:150px">
+    <label for="apikey">API key</label>
+    <input type="password" id="apikey" value="" placeholder="only if server sets one" autocomplete="off">
+  </div>
   <div>
     <label for="mock">Mode</label>
     <select id="mock"><option value="false">Live Nebius</option><option value="true">Mock fallback</option></select>
@@ -550,6 +554,12 @@ const $ = (id) => document.getElementById(id);
 const state = { scenario: null, run: null, audit: null, improved: null, improvedRun: null };
 
 $("base").value = location.origin;
+/* Remember the key per browser so it survives a reload. Storage can throw in a
+   private window, and the console must still work without it. */
+try { $("apikey").value = localStorage.getItem("stresstest-api-key") || ""; } catch (e) {}
+$("apikey").addEventListener("change", () => {
+  try { localStorage.setItem("stresstest-api-key", $("apikey").value.trim()); } catch (e) {}
+});
 const base = () => $("base").value.replace(/\/$/, "");
 const mock = () => $("mock").value === "true";
 const qs = () => (mock() ? "?use_mock=true" : "");
@@ -560,9 +570,19 @@ const fmtPct = (n) => n.toFixed(2) + "%";
 function setErr(id, e) { $(id).textContent = e ? String(e.message || e) : ""; }
 function setMeta(id, ms, extra) { $(id).textContent = ms == null ? "" : `${Math.round(ms)} ms${extra ? " · " + extra : ""}`; }
 
+/* The key is only needed when the server sets STRESSTEST_API_KEY; sending it
+   otherwise is harmless, so it is always attached. */
+const apiKey = () => ($("apikey") ? $("apikey").value.trim() : "");
+function authed(headers) {
+  const key = apiKey();
+  return key ? { ...(headers || {}), "X-API-Key": key } : { ...(headers || {}) };
+}
+
 async function call(path, options, metaId) {
   const t0 = performance.now();
-  const res = await fetch(base() + path, options);
+  const opts = { ...(options || {}) };
+  opts.headers = authed(opts.headers);
+  const res = await fetch(base() + path, opts);
   const ms = performance.now() - t0;
   if (!res.ok) throw new Error(`${res.status} ${res.statusText} — ${(await res.text()).slice(0, 220)}`);
   const json = await res.json();
@@ -780,8 +800,9 @@ $("btn-sim").onclick = async () => {
     $("log").innerHTML = ""; showCrash(null); setMeta("meta-sim", null);
     const equity = [], price = [];
     const t0 = performance.now();
-    const res = await fetch(`${base()}/api/simulations?tick_delay_ms=${$("speed").value}`,
-      postJSON({ strategy: { name: "console_strategy", code: $("code").value }, scenario: scenarioPayload(), variant: "original" }));
+    const streamOpts = postJSON({ strategy: { name: "console_strategy", code: $("code").value }, scenario: scenarioPayload(), variant: "original" });
+    streamOpts.headers = authed(streamOpts.headers);
+    const res = await fetch(`${base()}/api/simulations?tick_delay_ms=${$("speed").value}`, streamOpts);
     if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
     const reader = res.body.getReader(), dec = new TextDecoder();
     let buf = "", frames = 0;

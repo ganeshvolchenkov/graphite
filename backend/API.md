@@ -3,6 +3,91 @@
 Base URL `http://localhost:8000`. Interactive schema at `/docs`, raw OpenAPI at `/openapi.json`.
 A working reference UI that drives every endpoint lives at `/dashboard`.
 
+## Authentication
+
+Everything under `/api/` requires a shared secret. Everything else — `/health`,
+`/dashboard`, `/brief`, `/fixtures.json`, `/docs`, `/` — is public, so the connection
+indicator and the offline fixtures work without a key.
+
+Send it as a header on every `/api/` request:
+
+```
+X-API-Key: <the key>
+```
+
+`Authorization: Bearer <the key>` is accepted as an alternative for curl and HTTP clients.
+`X-API-Key` is the one to use from the browser.
+
+### Responses
+
+| Situation | Status | Body |
+|---|---|---|
+| Valid key | normal | the documented payload |
+| No header | `401` | `{"detail":"Missing credentials. Send the X-API-Key header."}` |
+| Wrong key | `401` | `{"detail":"Invalid API key."}` |
+
+A `401` carries the CORS headers, so the browser surfaces a real `401` you can read —
+not an opaque CORS failure. If you see a CORS error instead of a 401, the problem is
+something else.
+
+### Where the key goes in the frontend
+
+**Never hardcode it and never commit it.** Treat it exactly like the backend URL: a
+value the user pastes into a settings field, persisted to `localStorage`, read through
+one helper. The key changes when the backend is redeployed.
+
+```ts
+// src/lib/api.ts — the single place both values are read
+const BASE_KEY = "apiBase";
+const AUTH_KEY = "apiKey";
+
+export const getApiBase = () =>
+  (localStorage.getItem(BASE_KEY) || "http://localhost:8000").replace(/\/$/, "");
+
+export const getApiKey = () => localStorage.getItem(AUTH_KEY) || "";
+
+/** Headers for any /api call. Use this everywhere — do not build headers inline. */
+export function authHeaders(extra?: Record<string, string>): Record<string, string> {
+  const headers: Record<string, string> = { ...extra };
+  const key = getApiKey();
+  if (key) headers["X-API-Key"] = key;
+  return headers;
+}
+
+export async function apiGet<T>(path: string): Promise<T> {
+  const res = await fetch(`${getApiBase()}${path}`, { headers: authHeaders() });
+  if (res.status === 401) throw new Error("Unauthorized — check the API key in settings");
+  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+  return res.json();
+}
+
+export async function apiPost<T>(path: string, body: unknown): Promise<T> {
+  const res = await fetch(`${getApiBase()}${path}`, {
+    method: "POST",
+    headers: authHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify(body),
+  });
+  if (res.status === 401) throw new Error("Unauthorized — check the API key in settings");
+  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+  return res.json();
+}
+```
+
+Surface a `401` as "check your API key in settings", not as a generic failure — it is the
+single most likely thing to go wrong when the backend URL changes.
+
+### Server side
+
+The key is read from the `STRESSTEST_API_KEY` environment variable.
+
+- **Set** → `/api/` requires it.
+- **Unset** → `/api/` is open and the server logs a warning at startup. This is deliberate:
+  local development needs no key, and a host that is missing the variable still demos
+  rather than returning `401` for everything. Any internet-reachable deployment must set it.
+
+Note this is separate from `NEBIUS_API_KEY`, which is how the *backend* authenticates to
+Nebius for model inference. That one never reaches the frontend.
+
 ## Conventions
 
 - **All request and response bodies are camelCase.** Python is snake_case internally; Pydantic
@@ -524,11 +609,13 @@ export async function streamSimulation(
   on: { tick(t: Tick): void; event(e: MarketEvent): void; complete(r: SimulationRun): void },
   tickDelayMs = 25,
 ) {
-  const res = await fetch(`http://localhost:8000/api/simulations?tickDelayMs=${tickDelayMs}`, {
+  const res = await fetch(`${getApiBase()}/api/simulations?tickDelayMs=${tickDelayMs}`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: authHeaders({ "Content-Type": "application/json" }),
     body: JSON.stringify(body),
   });
+  if (res.status === 401) throw new Error("Unauthorized — check the API key in settings");
+  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
   const reader = res.body!.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
@@ -571,6 +658,9 @@ message like "adapting your strategy" until the first `tick` lands.
 7. **Equity base is 1,000,000**, so absolute `pnl` numbers look small next to it. `pnlPct` rounds to
    `-0.0` on tiny losses; prefer formatting `pnl` directly for small runs.
 8. **Run history is in-memory.** Restarting the backend clears `/api/runs`.
-9. **CORS allows all origins** for `GET/POST/OPTIONS` — no config needed on the frontend side.
+9. **CORS allows all origins** for `GET/POST/OPTIONS` plus the `X-API-Key` header — no
+   config needed on the frontend side.
 10. **Adapter generation is non-deterministic.** The same pasted script can produce slightly
     different fill counts across runs. Don't build UI that asserts run-to-run equality.
+11. **A `401` means the API key, not the URL.** Both are settings fields and both change on
+    redeploy, so show them together and make the error name which one is wrong.

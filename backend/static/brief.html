@@ -468,22 +468,29 @@ stored file served verbatim.
 
 ## Hard requirements
 
-1. **The backend URL must be editable at runtime.** A settings input, persisted to
-   `localStorage` under `apiBase`. Every call routes through one
-   `getApiBase()` helper in `src/lib/api.ts`. The URL changes whenever the
-   backend is redeployed, and re-prompting to change a hardcoded constant wastes
+1. **The backend URL and API key must both be editable at runtime.** Two
+   settings inputs, persisted to `localStorage` under `apiBase` and `apiKey`,
+   both read through one `src/lib/api.ts`. Both values change whenever the
+   backend is redeployed, and re-prompting to edit hardcoded constants wastes
    time. Include a connection status dot in the header polling `GET /health`
    every 10s — green on `{"status":"ok"}`, red otherwise.
-2. **`EventSource` will not work.** The simulation stream is SSE over **POST**.
+2. **Auth: send `X-API-Key: <key>` on every `/api/` request.** Everything
+   outside `/api/` is public, so the status dot and the fixtures need no key. A
+   `401` returns `{"detail": "..."}` and carries CORS headers, so you get a
+   readable error rather than an opaque CORS failure — surface it as "check your
+   API key in settings", since that is the most likely thing to break after a
+   redeploy. Never hardcode or commit the key. `backend/API.md` has a ready
+   `authHeaders()` helper.
+3. **`EventSource` will not work.** The simulation stream is SSE over **POST**.
    Use `fetch` with a `ReadableStream` reader — there is a working implementation
    in `backend/API.md`.
-3. **Build against fixtures first.** `GET /fixtures.json` on the backend returns
+4. **Build against fixtures first.** `GET /fixtures.json` on the backend returns
    real captured responses for every endpoint, keyed by endpoint name, including
    a full 220-tick simulation. Download it once, commit it into the project, and
    develop with the backend switched off. Wire live calls last.
-4. **Every response is camelCase** except `/api/benchmark`.
-5. Percentages are already percentages — `drawdownPct: 12.4` means 12.4%.
-6. Equity starts at 1,000,000, so absolute P&L numbers look small beside it.
+5. **Every response is camelCase** except `/api/benchmark`.
+6. Percentages are already percentages — `drawdownPct: 12.4` means 12.4%.
+7. Equity starts at 1,000,000, so absolute P&L numbers look small beside it.
 
 ## Design direction
 
