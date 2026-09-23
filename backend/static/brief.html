@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>StressTest Frontend Brief</title>
+<style>
+  :root {
+    --bg: #ffffff;
+    --surface: #f6f7f9;
+    --surface-2: #eceef2;
+    --border: #d8dce3;
+    --ink: #14171c;
+    --ink-2: #4a515c;
+    --ink-3: #757d8a;
+    --accent: #1f5fd8;
+    --accent-soft: #e5edfd;
+    --good: #1a7f4b;
+    --warn: #8a5a00;
+    --crit: #b3261e;
+    --code-bg: #f2f3f6;
+    --radius: 10px;
+    --mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+    --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0d1013;
+      --surface: #14181d;
+      --surface-2: #1c2229;
+      --border: #2a323b;
+      --ink: #e9edf2;
+      --ink-2: #aab3bf;
+      --ink-3: #79838f;
+      --accent: #6ea3ff;
+      --accent-soft: #16243c;
+      --good: #5cc98d;
+      --warn: #e0ad4b;
+      --crit: #ef7b72;
+      --code-bg: #11151a;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0d1013;
+    --surface: #14181d;
+    --surface-2: #1c2229;
+    --border: #2a323b;
+    --ink: #e9edf2;
+    --ink-2: #aab3bf;
+    --ink-3: #79838f;
+    --accent: #6ea3ff;
+    --accent-soft: #16243c;
+    --good: #5cc98d;
+    --warn: #e0ad4b;
+    --crit: #ef7b72;
+    --code-bg: #11151a;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 16px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 860px; margin: 0 auto; padding: 0 16px 96px; }
+
+  header { padding: 48px 0 28px; border-bottom: 1px solid var(--border); }
+  .eyebrow {
+    font-family: var(--mono); font-size: 12px; letter-spacing: .09em;
+    text-transform: uppercase; color: var(--ink-3); margin: 0 0 12px;
+  }
+  h1 { font-size: clamp(28px, 5vw, 40px); line-height: 1.15; margin: 0 0 12px; letter-spacing: -.02em; }
+  .lede { font-size: 18px; color: var(--ink-2); margin: 0 0 24px; max-width: 62ch; }
+
+  .actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+  button {
+    font: inherit; font-size: 15px; font-weight: 550;
+    padding: 11px 18px; border-radius: 8px; cursor: pointer;
+    border: 1px solid transparent; background: var(--accent); color: #fff;
+    transition: opacity .15s ease;
+  }
+  button:hover { opacity: .88; }
+  button.secondary { background: var(--surface-2); color: var(--ink); border-color: var(--border); }
+  .hint { font-size: 14px; color: var(--ink-3); }
+
+  h2 {
+    font-size: 13px; font-family: var(--mono); letter-spacing: .09em;
+    text-transform: uppercase; color: var(--ink-3);
+    margin: 52px 0 18px; padding-bottom: 8px; border-bottom: 1px solid var(--border);
+  }
+  h3 { font-size: 18px; margin: 0 0 8px; letter-spacing: -.01em; }
+  p { margin: 0 0 14px; color: var(--ink-2); }
+  p strong, li strong { color: var(--ink); font-weight: 600; }
+  ul { margin: 0 0 14px; padding-left: 20px; color: var(--ink-2); }
+  li { margin-bottom: 7px; }
+  code {
+    font-family: var(--mono); font-size: .875em;
+    background: var(--code-bg); border: 1px solid var(--border);
+    padding: 1px 5px; border-radius: 4px; color: var(--ink);
+  }
+
+  .card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 20px 22px; margin-bottom: 14px;
+  }
+  .card .num {
+    font-family: var(--mono); font-size: 12px; font-weight: 600;
+    color: var(--accent); background: var(--accent-soft);
+    border-radius: 5px; padding: 3px 8px; margin-right: 10px;
+  }
+  .card-head { display: flex; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 6px; }
+  .card-head h3 { margin: 0; }
+  .endpoint {
+    display: inline-block; font-family: var(--mono); font-size: 12px;
+    color: var(--ink-2); background: var(--code-bg);
+    border: 1px solid var(--border); border-radius: 5px;
+    padding: 2px 7px; margin-bottom: 12px;
+  }
+
+  .callout {
+    border-left: 3px solid var(--accent); background: var(--accent-soft);
+    padding: 14px 18px; border-radius: 0 8px 8px 0; margin: 0 0 16px;
+  }
+  .callout p:last-child { margin-bottom: 0; }
+  .callout.warn { border-left-color: var(--warn); background: color-mix(in srgb, var(--warn) 10%, var(--bg)); }
+
+  .grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); margin-bottom: 16px; }
+  .tile { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px 18px; }
+  .tile .k { font-family: var(--mono); font-size: 11px; letter-spacing: .07em; text-transform: uppercase; color: var(--ink-3); margin-bottom: 6px; }
+  .tile .v { font-size: 15px; color: var(--ink); line-height: 1.45; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 14px; margin-bottom: 16px; }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--border); }
+  th { font-family: var(--mono); font-size: 11px; letter-spacing: .07em; text-transform: uppercase; color: var(--ink-3); font-weight: 600; }
+  td { color: var(--ink-2); }
+  td.mono, th.num, td.num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+  td.num, th.num { text-align: right; }
+
+  .toast {
+    position: fixed; left: 50%; bottom: 28px; transform: translate(-50%, 16px);
+    background: var(--ink); color: var(--bg); font-size: 14px; font-weight: 550;
+    padding: 11px 20px; border-radius: 8px; opacity: 0; pointer-events: none;
+    transition: opacity .18s ease, transform .18s ease; z-index: 50;
+  }
+  .toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+  footer { margin-top: 56px; padding-top: 20px; border-top: 1px solid var(--border); color: var(--ink-3); font-size: 14px; }
+
+  @media (max-width: 560px) {
+    header { padding-top: 32px; }
+    .card { padding: 16px; }
+    table { font-size: 13px; }
+    th, td { padding: 8px 8px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <p class="eyebrow">Handoff · backend → frontend</p>
+  <h1>StressTest frontend brief</h1>
+  <p class="lede">Everything the backend does, what each screen needs to show, and the rules that will
+  otherwise cost you an hour. Written to be pasted straight into Lovable.</p>
+  <div class="actions">
+    <button id="copy">Copy full brief for Lovable</button>
+    <button class="secondary" id="theme">Toggle theme</button>
+    <span class="hint">Paste this first, then <code>backend/API.md</code> as a follow-up.</span>
+  </div>
+</header>
+
+<h2>What the product is</h2>
+<p><strong>StressTest breaks trading strategies before the market does.</strong> A quant pastes their
+strategy code and describes a market catastrophe in plain English — <em>"ECB emergency rate hike,
+EUR/USD spread widens from 0.8 to 65 pips in 300ms, bid-side depth evaporates 94%, then a 450ms feed
+freeze"</em>. The system turns that sentence into a real, executable simulation, runs their actual
+Python against it tick by tick, and shows the exact moment their code dies.</p>
+<p>Then it explains why, rewrites the code to survive, and re-runs it to prove the fix worked. The buyer
+is a prop desk or quant fund — the tone is professional trading software, not consumer SaaS.</p>
+
+<h2>Three AI jobs, each with visible evidence</h2>
+<div class="grid">
+  <div class="tile">
+    <div class="k">1 · Comprehension</div>
+    <div class="v">A reasoning model turns an institutional prompt into a structured market script, and
+    reports which phrases it understood and what it did with each one — quote by quote.</div>
+  </div>
+  <div class="tile">
+    <div class="k">2 · Code adaptation</div>
+    <div class="v">A code model reads arbitrary strategy source — Zipline class, Backtrader
+    <code>next()</code>, bare signal function — and writes the glue so it runs unmodified.</div>
+  </div>
+  <div class="tile">
+    <div class="k">3 · Repair</div>
+    <div class="v">After the failure, a model explains it and rewrites the code with the missing guards,
+    which is then re-run for a before/after.</div>
+  </div>
+</div>
+<div class="callout">
+  <p><strong>The system deliberately does not fix the user's bugs.</strong> If their code divides by zero
+  when the book empties, it still divides by zero — that failure is the product's output. Treat a crash
+  as the headline result, not an error state to apologise for.</p>
+</div>
+
+<h2>The six stages</h2>
+
+<div class="card">
+  <div class="card-head"><span class="num">01</span><h3>Scenario — plain English to numbers</h3></div>
+  <div class="endpoint">POST /api/scenarios/interpret</div>
+  <ul>
+    <li><strong>A requirements table.</strong> One row per demand found: the literal quote from the
+    prompt, a status pill (<code>modelled</code> / <code>approximated</code> /
+    <code>unsupported</code>), what it <code>mappedTo</code>, and a note. The most important panel in
+    the app — it proves the model read the prompt rather than pattern-matched it. Never truncate the quotes.</li>
+    <li><strong>A coverage number</strong> (<code>coveragePct</code>). Label it "self-assessed" — it is
+    the model's own judgement, and saying so is more credible than hiding it.</li>
+    <li><strong>An event timeline.</strong> <code>script.events[]</code> each have an <code>atMs</code>
+    and a duration — render as a horizontal Gantt, coloured by type.</li>
+    <li><strong><code>adjustments[]</code></strong> — deterministic corrections the backend applied
+    after the model answered. Shows real engineering behind the model call.</li>
+    <li>Offer 3–4 preset prompts as buttons. Judges will not type a 60-word institutional prompt.</li>
+  </ul>
+</div>
+
+<div class="card">
+  <div class="card-head"><span class="num">02</span><h3>Simulation — watch it break</h3></div>
+  <div class="endpoint">POST /api/simulations · SSE stream</div>
+  <p>This is the moment that wins or loses the pitch, so it must animate.</p>
+  <ul>
+    <li>A live price/equity chart building left to right, ~25ms per tick, ~6s for a full run.</li>
+    <li>Band the background by <code>tick.phase</code>: warmup / shock / recovery / stabilised.</li>
+    <li>A scrolling event log from <code>market_event</code> frames, colour-coded by severity. Real
+    messages: <em>"Spread blew out to 43.7 pips"</em>, <em>"Book CROSSED: bid above ask"</em>,
+    <em>"Bid side evaporated"</em>, <em>"Market data feed frozen"</em>.</li>
+    <li><strong>If <code>strategyError</code> is non-null, that is the headline.</strong> Vertical rule
+    at the exact tick: <em>"ZeroDivisionError at tick 170 of 220 — your code stopped here."</em></li>
+    <li><strong>If <code>adapter.adapted</code> is true, show the adapter panel</strong> — the interface
+    the AI found, every mapping, and the risks it flagged (e.g. <em>"the strategy ignores bar.halted, so
+    it keeps quoting through the halt"</em>).</li>
+    <li>Several seconds pass before the first tick while the AI prepares the strategy. Show a status
+    line saying what is happening, not a bare spinner.</li>
+  </ul>
+</div>
+
+<div class="card">
+  <div class="card-head"><span class="num">03</span><h3>Audit — why it failed</h3></div>
+  <div class="endpoint">POST /api/audits</div>
+  <p>Verdict (passed/marginal/failed), 0–100 score, headline, narrative, plus
+  <code>strengths[]</code>, <code>weaknesses[]</code> and <code>failureModes[]</code> — each with its
+  own severity. Two columns, severity-sorted.</p>
+</div>
+
+<div class="card">
+  <div class="card-head"><span class="num">04</span><h3>Auto-patch — and prove it helped</h3></div>
+  <div class="endpoint">POST /api/strategies/improve</div>
+  <p>Returns rewritten <code>code</code>, a summary, and <code>recommendations[]</code> (problem /
+  change / impact). Show a side-by-side diff, then a "re-run patched version" button that sends the new
+  code through stage 2 with <code>variant: "improved"</code>.</p>
+  <p><strong>End on a before/after:</strong> two equity curves on one chart, original vs improved, both
+  P&amp;L figures. That comparison is the closing frame of the demo.</p>
+</div>
+
+<div class="card">
+  <div class="card-head"><span class="num">05</span><h3>Run history</h3></div>
+  <div class="endpoint">GET /api/runs</div>
+  <p>A compact table of past runs. Low priority — build it last.</p>
+</div>
+
+<div class="card">
+  <div class="card-head"><span class="num">06</span><h3>Model benchmark</h3></div>
+  <div class="endpoint">GET /api/benchmark</div>
+  <p>Three models scored on how well they comprehend institutional prompts, across 5 hand-labelled
+  cases — event recall, numeric parameter fidelity, instrument inference, resolution choice. Leaderboard
+  plus a models × cases grid.</p>
+  <table>
+    <thead><tr><th>Model</th><th class="num">Score</th></tr></thead>
+    <tbody>
+      <tr><td class="mono">deepseek-ai/DeepSeek-V4-Pro</td><td class="num">100.0</td></tr>
+      <tr><td class="mono">Qwen/Qwen3-235B-A22B-Instruct-2507</td><td class="num">97.2</td></tr>
+      <tr><td class="mono">Qwen/Qwen3-30B-A3B-Instruct-2507</td><td class="num">94.8</td></tr>
+    </tbody>
+  </table>
+  <p>This endpoint returns <strong>snake_case</strong>, unlike every other endpoint — it is a stored file
+  served verbatim.</p>
+</div>
+
+<h2>Hard requirements</h2>
+<div class="callout warn">
+  <p><strong>The backend URL must be editable at runtime.</strong> A settings input persisted to
+  <code>localStorage</code> under <code>apiBase</code>, with every call routed through one
+  <code>getApiBase()</code> helper. The URL changes on every redeploy, and re-prompting to edit a
+  hardcoded constant wastes real time. Add a status dot polling <code>GET /health</code> every 10s.</p>
+</div>
+<ul>
+  <li><strong><code>EventSource</code> will not work</strong> — the stream is SSE over <em>POST</em>. Use
+  <code>fetch</code> with a <code>ReadableStream</code> reader; there is a working implementation in
+  <code>backend/API.md</code>.</li>
+  <li><strong>Build against fixtures first.</strong> <code>GET /fixtures.json</code> returns real
+  captured responses for every endpoint, including a full 220-tick simulation. Commit it into the
+  project and develop with the backend switched off.</li>
+  <li>Every response is <strong>camelCase</strong> except <code>/api/benchmark</code>.</li>
+  <li>Percentages are already percentages — <code>drawdownPct: 12.4</code> means 12.4%.</li>
+  <li>Equity starts at 1,000,000, so absolute P&amp;L numbers look small beside it.</li>
+</ul>
+
+<h2>Design direction</h2>
+<p>Dark, dense, professional — Bloomberg terminal rather than marketing site. Tabular numerals wherever
+numbers appear, so they do not jitter as they update during the stream. Monospace for code, prompts and
+quoted phrases. A restrained palette: one neutral surface ramp, one accent for the strategy's series, and
+a reserved status set never reused for ordinary data.</p>
+<ul>
+  <li><strong>Never a dual-axis chart.</strong> Two measures of different scale get two stacked charts
+  sharing an x-axis, never two y-scales.</li>
+  <li>Thin marks, recessive gridlines, direct labels on a few points rather than a number on every point.</li>
+  <li>A legend whenever two or more series are present.</li>
+  <li><strong>Status must never be colour alone</strong> — pair every severity colour with an icon or
+  label. Roughly 1 in 12 men has a colour vision deficiency and the judging panel is a small sample.</li>
+  <li><strong>Two different severity scales exist.</strong> <code>MarketEvent.severity</code> is
+  info/warn/critical/good; <code>Weakness.severity</code> is low/medium/high/critical. Do not share one
+  colour map.</li>
+</ul>
+
+<h2>What not to build</h2>
+<p>No auth, no signup, no onboarding, no landing page, no pricing, no user accounts. It is a single-screen
+tool that a judge opens and immediately uses. Every second spent on chrome is a second not spent on the
+six stages above.</p>
+
+<footer>
+  Full response shapes and TypeScript types: <code>backend/API.md</code>. Captured sample responses:
+  <code>GET /fixtures.json</code>. Reference implementation driving every endpoint:
+  <code>/dashboard</code> on the backend.
+</footer>
+
+</div>
+
+<div class="toast" id="toast">Brief copied — paste it into Lovable</div>
+
+<script id="raw" type="text/markdown"># StressTest — frontend brief
+
+Paste this whole file into Lovable as the opening prompt. The exact response
+shapes and TypeScript types are in `backend/API.md` — paste that as a follow-up
+message once the app scaffolding exists.
+
+---
+
+## What the product is
+
+**StressTest** breaks trading strategies before the market does.
+
+A quant pastes their strategy code and describes a market catastrophe in plain
+English — *"ECB emergency rate hike, EUR/USD spread widens from 0.8 to 65 pips
+in 300ms, bid-side depth evaporates 94%, then a 450ms feed freeze"*. The system
+turns that sentence into a real, executable market simulation, runs their actual
+Python against it tick by tick, and shows them the exact moment their code dies.
+
+Then it explains why, rewrites the code to survive, and re-runs it to prove the
+fix worked.
+
+The buyer is a prop trading desk or quant fund. The tone is professional trading
+software, not a consumer SaaS landing page.
+
+## Why it is interesting (this is an AI hackathon — this part must be visible)
+
+Three separate AI jobs happen, and each one produces evidence the UI should show:
+
+1. **Comprehension.** A reasoning model reads an institutional prompt and emits a
+   structured market script — instrument, tick resolution, and a timeline of
+   order-book events. It reports *which phrases it understood and what it did
+   with each one*, quote by quote.
+2. **Code adaptation.** Real strategies do not have the function signature our
+   harness calls. A code model reads arbitrary strategy source — a Zipline-style
+   class, a Backtrader `next()`, a bare signal function — and writes the glue so
+   it runs unmodified. It reports the interface it found, every translation it
+   made, and the risks it could not translate faithfully.
+3. **Repair.** After the strategy fails, a model explains the failure and rewrites
+   the code with the missing guards, which then gets re-run for a before/after.
+
+**The system deliberately does not fix the user's bugs.** If their code divides by
+zero when the book empties, it still divides by zero — that failure is the
+product's output. The UI should treat a crash as the headline result, not an error
+state to apologise for.
+
+## The screen flow
+
+Six stages. They can be one scrolling console or a stepper — but stage 2 must
+feel live, and the user must be able to see earlier stages' output while reading
+later ones.
+
+### 1. Scenario — plain English to numbers
+User types a market catastrophe. Calls `POST /api/scenarios/interpret`.
+
+Show:
+- **A requirements table.** One row per demand the model found: the literal
+  `quote` from their prompt, a status pill (`modelled` / `approximated` /
+  `unsupported`), what it `mappedTo`, and a `note`. This is the single most
+  important panel in the app — it proves the model read the prompt rather than
+  pattern-matched it. Never collapse or truncate the quotes.
+- **A coverage number** (`coveragePct`, 0–100). Label it "self-assessed coverage"
+  — it is the model's own judgement, and saying so is more credible than hiding it.
+- **An event timeline.** `script.events[]` is a list of order-book events with
+  `atMs` and a duration. Render as a horizontal Gantt — time on x, one bar per
+  event, coloured by type. This makes an abstract paragraph legible at a glance.
+- **The model's reasoning**: why this instrument, why this tick resolution.
+- **`adjustments[]`** — deterministic corrections the backend applied after the
+  model answered (e.g. "inferred a -1.08% price impulse from the described
+  bid-side damage"). Show these. They prove real engineering sits behind the
+  model call rather than a raw passthrough.
+
+Offer 3–4 preset prompts as buttons. Judges will not type a 60-word
+institutional prompt themselves.
+
+### 2. Simulation — watch it break
+Streams from `POST /api/simulations` over SSE. **This is the moment that wins or
+loses the pitch, so it must animate.**
+
+- A live price/equity chart building left to right as ticks arrive (~25ms apart,
+  about 6 seconds for a full run).
+- Band the chart background by `tick.phase`: `warmup` / `shock` / `recovery` /
+  `stabilised`.
+- A scrolling event log fed by `market_event` frames, colour-coded by `severity`
+  (`info` / `warn` / `critical` / `good`). Real messages include *"Spread blew out
+  to 43.7 pips"*, *"Book CROSSED: bid above ask"*, *"Bid side evaporated"*,
+  *"Market data feed frozen"*.
+- Live metric tiles: P&L, position, drawdown, spread, liquidity remaining.
+- **If `strategyError` is non-null, that is the headline.** Mark the exact tick on
+  the chart with a vertical rule and show something like *"ZeroDivisionError at
+  tick 170 of 220 — your code stopped here"*, with the message. Make it feel like
+  a finding, not a bug report.
+- **If `adapter.adapted` is true, show the adapter panel**: the `interface` the AI
+  found, the `mapping[]` it performed, and the `risks[]` it flagged. Example risk:
+  *"the strategy ignores bar.halted, so it keeps quoting through the halt."*
+
+There is a several-second wait before the first tick while the AI prepares the
+strategy. Show a status line that says what is happening ("adapting your
+strategy…"), not a bare spinner.
+
+### 3. Audit — why it failed
+`POST /api/audits`. A verdict (`passed`/`marginal`/`failed`), a 0–100 score, a
+headline, a narrative, plus `strengths[]`, `weaknesses[]` and `failureModes[]`
+(each with its own severity). Two columns, severity-sorted.
+
+### 4. Auto-patch — and prove it helped
+`POST /api/strategies/improve` returns rewritten `code`, a `summary`, and
+`recommendations[]` (each with `problem` / `change` / `impact`).
+
+Show a **side-by-side diff**, then a "re-run patched version" button that sends the
+new code back through stage 2 with `variant: "improved"`. End on a
+**before/after comparison**: two equity curves on one chart, original vs improved,
+with both P&L figures. That comparison is the closing frame of the demo.
+
+### 5. Run history
+`GET /api/runs` — a compact table of past runs. Low priority, build it last.
+
+### 6. Model benchmark
+`GET /api/benchmark`. We scored three models on how well they comprehend
+institutional prompts, across 5 hand-labelled cases, on event recall, numeric
+parameter fidelity, instrument inference and resolution choice.
+
+Render `models` as a leaderboard and `detail` as a models × cases grid. Real
+results: DeepSeek-V4-Pro 100.0, Qwen3-235B 97.2, Qwen3-30B 94.8.
+
+**Note this endpoint returns snake_case**, unlike every other endpoint. It is a
+stored file served verbatim.
+
+## Hard requirements
+
+1. **The backend URL must be editable at runtime.** A settings input, persisted to
+   `localStorage` under `apiBase`. Every call routes through one
+   `getApiBase()` helper in `src/lib/api.ts`. The URL changes whenever the
+   backend is redeployed, and re-prompting to change a hardcoded constant wastes
+   time. Include a connection status dot in the header polling `GET /health`
+   every 10s — green on `{"status":"ok"}`, red otherwise.
+2. **`EventSource` will not work.** The simulation stream is SSE over **POST**.
+   Use `fetch` with a `ReadableStream` reader — there is a working implementation
+   in `backend/API.md`.
+3. **Build against fixtures first.** `GET /fixtures.json` on the backend returns
+   real captured responses for every endpoint, keyed by endpoint name, including
+   a full 220-tick simulation. Download it once, commit it into the project, and
+   develop with the backend switched off. Wire live calls last.
+4. **Every response is camelCase** except `/api/benchmark`.
+5. Percentages are already percentages — `drawdownPct: 12.4` means 12.4%.
+6. Equity starts at 1,000,000, so absolute P&L numbers look small beside it.
+
+## Design direction
+
+Dark, dense, professional — Bloomberg terminal rather than marketing site. Tabular
+numerals everywhere numbers appear; numbers must not jitter as they update during
+the stream. Monospace for code, prompts and quoted phrases.
+
+A restrained palette: one neutral surface ramp, one accent for the strategy's own
+series, and a reserved status set for `info`/`warn`/`critical`/`good` that is
+never reused for ordinary data series.
+
+Charts:
+- **Never a dual-axis chart.** Two measures of different scale get two stacked
+  charts sharing an x-axis, never two y-scales.
+- Thin marks, recessive gridlines, direct labels on a few points rather than a
+  number on every point.
+- A legend whenever two or more series are present.
+- Status must never be carried by colour alone — pair every severity colour with
+  an icon or text label, since roughly 1 in 12 men has a colour vision deficiency
+  and the judges are a small sample.
+
+Two severity scales exist and they are different — `MarketEvent.severity` is
+`info|warn|critical|good`, `Weakness.severity` is `low|medium|high|critical`.
+Do not share one colour map between them.
+
+## What not to build
+
+No auth, no signup, no onboarding, no landing page, no pricing page, no user
+accounts. It is a single-screen tool that a judge opens and immediately uses.
+Every second spent on chrome is a second not spent on the six stages above.
+</script>
+<script>
+  (function () {
+    var toast = document.getElementById('toast');
+    function flash(msg) {
+      toast.textContent = msg;
+      toast.classList.add('show');
+      setTimeout(function () { toast.classList.remove('show'); }, 2200);
+    }
+
+    document.getElementById('copy').addEventListener('click', function () {
+      var text = document.getElementById('raw').textContent;
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(
+          function () { flash('Brief copied — paste it into Lovable'); },
+          function () { flash('Copy blocked — select the text manually'); }
+        );
+      } else {
+        var ta = document.createElement('textarea');
+        ta.value = text;
+        document.body.appendChild(ta);
+        ta.select();
+        try { document.execCommand('copy'); flash('Brief copied — paste it into Lovable'); }
+        catch (e) { flash('Copy blocked — select the text manually'); }
+        document.body.removeChild(ta);
+      }
+    });
+
+    var KEY = 'brief-theme';
+    var stored = null;
+    try { stored = localStorage.getItem(KEY); } catch (e) {}
+    if (stored) { document.documentElement.setAttribute('data-theme', stored); }
+
+    document.getElementById('theme').addEventListener('click', function () {
+      var cur = document.documentElement.getAttribute('data-theme');
+      if (!cur) {
+        cur = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      }
+      var next = cur === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', next);
+      try { localStorage.setItem(KEY, next); } catch (e) {}
+    });
+  })();
+</script>
+</body>
+</html>

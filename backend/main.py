@@ -53,6 +53,12 @@ def dashboard() -> FileResponse:
     return FileResponse(STATIC / "dashboard.html", media_type="text/html")
 
 
+@app.get("/brief", include_in_schema=False)
+def brief() -> FileResponse:
+    """The frontend handoff brief, with a copy button for the Lovable prompt."""
+    return FileResponse(STATIC / "brief.html", media_type="text/html")
+
+
 @app.get("/fixtures.json", include_in_schema=False)
 def fixtures() -> FileResponse:
     """Captured responses for every endpoint, so the frontend can be built offline."""
