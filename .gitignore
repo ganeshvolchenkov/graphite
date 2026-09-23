@@ -18,3 +18,10 @@ out/
 # OS files
 .DS_Store
 Thumbs.db
+
+# Local dev server / tunnel scratch
+.uvicorn.log
+.uvicorn.err.log
+.tunnel.log
+.tunnel.out.log
+.sse_probe.py
