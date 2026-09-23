@@ -5,11 +5,15 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-nebius_api_key = os.getenv("NEBIUS_API_KEY")
-client = AsyncOpenAI(
-    base_url="https://api.tokenfactory.nebius.com/v1/",
-    api_key=nebius_api_key
-)
+
+def get_client() -> AsyncOpenAI:
+    """Built per call, not at import. A missing key must fail this one endpoint,
+    not stop the whole app from starting — on a host with no key the app still
+    needs to serve /health, /dashboard and every use_mock route."""
+    return AsyncOpenAI(
+        base_url="https://api.tokenfactory.nebius.com/v1/",
+        api_key=os.getenv("NEBIUS_API_KEY"),
+    )
 
 async def generate_synthetic_market_tape(scenario_prompt: str) -> list:
     """Uses Llama 3.1 70B to generate the synthetic market tape."""
@@ -18,7 +22,7 @@ async def generate_synthetic_market_tape(scenario_prompt: str) -> list:
         "Return ONLY a JSON array of objects, where each object has the keys: time, event, price, volume. Do not include markdown blocks or any other text."
     )
     
-    response = await client.chat.completions.create(
+    response = await get_client().chat.completions.create(
         model="deepseek-ai/DeepSeek-V4-Pro",
         messages=[{"role": "user", "content": prompt}],
         temperature=0.7
@@ -56,7 +60,7 @@ async def audit_code_and_generate_diff(code: str, tape: list) -> dict:
         "Do not include markdown blocks or any other text."
     )
     
-    response = await client.chat.completions.create(
+    response = await get_client().chat.completions.create(
         model="deepseek-ai/DeepSeek-V4-Pro",
         messages=[{"role": "user", "content": prompt}],
         temperature=0.2
