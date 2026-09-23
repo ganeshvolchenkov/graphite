@@ -5,7 +5,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, RedirectResponse
 
 from mock_data import MOCK_RESPONSE
 from routers import audits, benchmark, runs, scenarios, simulations, strategies
@@ -35,6 +35,12 @@ app.include_router(benchmark.router)
 
 
 STATIC = Path(__file__).parent / "static"
+
+
+@app.get("/", include_in_schema=False)
+def index() -> RedirectResponse:
+    """Opening the bare URL should land on something, not a 404."""
+    return RedirectResponse(url="/dashboard")
 
 
 @app.get("/health")
