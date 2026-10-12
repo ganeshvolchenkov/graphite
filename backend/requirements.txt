@@ -1,6 +1,10 @@
-fastapi
-uvicorn
-openai
-pydantic
-python-dotenv
-tavily-python
+# Pinned so a deploy on judging day installs what was tested here.
+fastapi==0.141.1
+uvicorn==0.53.0
+openai==3.19.0
+pydantic==2.13.5
+python-dotenv==1.2.3
+
+# Not imported by the backend itself: strategy code running in the sandbox is
+# allowed to import it, so it must be present or numpy strategies fail on load.
+numpy==2.4.6

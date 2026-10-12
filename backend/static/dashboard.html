@@ -1,0 +1,1007 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Graphite API Console</title>
+<style>
+  :root {
+    color-scheme: light;
+    --surface-1: #fcfcfb;
+    --plane: #f9f9f7;
+    --ink-1: #0b0b0b;
+    --ink-2: #52514e;
+    --ink-muted: #898781;
+    --grid: #e1e0d9;
+    --axis: #c3c2b7;
+    --border: rgba(11,11,11,0.10);
+    --series-1: #2a78d6;
+    --series-2: #eb6834;
+    --good: #0ca30c;
+    --warning: #fab219;
+    --serious: #ec835a;
+    --critical: #d03b3b;
+    --code-bg: #f2f1ed;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) {
+      color-scheme: dark;
+      --surface-1: #1a1a19;
+      --plane: #0d0d0d;
+      --ink-1: #ffffff;
+      --ink-2: #c3c2b7;
+      --ink-muted: #898781;
+      --grid: #2c2c2a;
+      --axis: #383835;
+      --border: rgba(255,255,255,0.10);
+      --series-1: #3987e5;
+      --series-2: #d95926;
+      --code-bg: #232322;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --surface-1: #1a1a19;
+    --plane: #0d0d0d;
+    --ink-1: #ffffff;
+    --ink-2: #c3c2b7;
+    --ink-muted: #898781;
+    --grid: #2c2c2a;
+    --axis: #383835;
+    --border: rgba(255,255,255,0.10);
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --code-bg: #232322;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 0 16px 64px;
+    background: var(--plane);
+    color: var(--ink-1);
+    font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  .wrap { max-width: 1120px; margin: 0 auto; }
+
+  header {
+    display: flex; flex-wrap: wrap; gap: 12px; align-items: center;
+    padding: 20px 0 16px; border-bottom: 1px solid var(--border); margin-bottom: 20px;
+  }
+  h1 { font-size: 18px; margin: 0; letter-spacing: -0.01em; }
+  h1 span { color: var(--ink-muted); font-weight: 400; }
+  .spacer { flex: 1 1 auto; }
+
+  .card {
+    background: var(--surface-1); border: 1px solid var(--border);
+    border-radius: 10px; padding: 18px; margin-bottom: 16px;
+  }
+  .card > h2 {
+    font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em;
+    color: var(--ink-muted); margin: 0 0 14px; font-weight: 600;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .step-n {
+    display: inline-grid; place-items: center; width: 20px; height: 20px;
+    border-radius: 50%; background: var(--series-1); color: #fff;
+    font-size: 11px; font-weight: 700;
+  }
+
+  label { display: block; font-size: 12px; color: var(--ink-2); margin-bottom: 5px; }
+  input[type=text], input[type=number], textarea, select {
+    width: 100%; padding: 8px 10px; border: 1px solid var(--axis);
+    border-radius: 6px; background: var(--surface-1); color: var(--ink-1);
+    font: inherit;
+  }
+  textarea { font-family: ui-monospace, "Cascadia Code", Consolas, monospace; font-size: 12.5px; resize: vertical; }
+  input:focus, textarea:focus, select:focus { outline: 2px solid var(--series-1); outline-offset: -1px; }
+
+  button {
+    padding: 9px 16px; border-radius: 6px; border: 1px solid transparent;
+    background: var(--series-1); color: #fff; font: inherit; font-weight: 600;
+    cursor: pointer;
+  }
+  button:hover:not(:disabled) { filter: brightness(1.08); }
+  button:disabled { opacity: 0.45; cursor: not-allowed; }
+  button.ghost { background: transparent; color: var(--ink-1); border-color: var(--axis); font-weight: 500; }
+  button.tiny { padding: 4px 10px; font-size: 12px; font-weight: 500; }
+
+  .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; }
+  .row > * { min-width: 0; }
+  .grid-params { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--ink-muted); display: inline-block; }
+  .dot.up { background: var(--good); }
+  .dot.down { background: var(--critical); }
+
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(118px, 1fr)); gap: 10px; margin: 14px 0; }
+  .tile { border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; }
+  .tile .k { font-size: 11px; color: var(--ink-muted); text-transform: uppercase; letter-spacing: 0.04em; }
+  .tile .v { font-size: 20px; font-weight: 650; margin-top: 3px; letter-spacing: -0.02em; }
+
+  .chart { width: 100%; height: 190px; display: block; touch-action: none; }
+  .chart-title { font-size: 12px; color: var(--ink-2); margin: 10px 0 2px; font-weight: 600; }
+  .legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 12px; color: var(--ink-2); margin-top: 6px; }
+  .legend i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; margin-right: 6px; vertical-align: -1px; }
+
+  .tip {
+    position: fixed; pointer-events: none; z-index: 20; opacity: 0;
+    background: var(--surface-1); border: 1px solid var(--border);
+    border-radius: 6px; padding: 7px 9px; font-size: 12px;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.16); white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .log { max-height: 190px; overflow-y: auto; border: 1px solid var(--border); border-radius: 8px; }
+  .log-line { display: flex; gap: 10px; padding: 7px 11px; font-size: 12.5px; border-bottom: 1px solid var(--border); }
+  .log-line:last-child { border-bottom: 0; }
+  .log-line time { color: var(--ink-muted); font-variant-numeric: tabular-nums; }
+  .sev { font-weight: 700; flex: 0 0 auto; }
+  .sev-info { color: var(--ink-2); } .sev-good { color: var(--good); }
+  .sev-warn { color: var(--serious); } .sev-critical { color: var(--critical); }
+
+  pre.code {
+    background: var(--code-bg); border: 1px solid var(--border); border-radius: 8px;
+    padding: 12px; overflow: auto; max-height: 340px;
+    font: 12.5px/1.55 ui-monospace, "Cascadia Code", Consolas, monospace; margin: 0;
+  }
+  details { margin-top: 10px; }
+  summary { cursor: pointer; font-size: 12px; color: var(--ink-muted); }
+
+  table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); font-size: 13px; }
+  th { color: var(--ink-muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; }
+  td.num, th.num { text-align: right; }
+
+  .chip { display: inline-block; padding: 2px 8px; border-radius: 99px; font-size: 11px; font-weight: 700; }
+  .chip-low { background: color-mix(in srgb, var(--good) 16%, transparent); color: var(--good); }
+  .chip-medium { background: color-mix(in srgb, var(--warning) 22%, transparent); color: var(--ink-1); }
+  .chip-high { background: color-mix(in srgb, var(--serious) 22%, transparent); color: var(--ink-1); }
+  .chip-critical { background: color-mix(in srgb, var(--critical) 16%, transparent); color: var(--critical); }
+  .chip-passed { background: color-mix(in srgb, var(--good) 16%, transparent); color: var(--good); }
+  .chip-marginal { background: color-mix(in srgb, var(--warning) 22%, transparent); color: var(--ink-1); }
+  .chip-failed { background: color-mix(in srgb, var(--critical) 16%, transparent); color: var(--critical); }
+
+  .meta { font-size: 12px; color: var(--ink-muted); font-variant-numeric: tabular-nums; }
+  .err { color: var(--critical); font-size: 13px; margin-top: 8px; }
+  .hint { font-size: 12px; color: var(--ink-muted); margin-top: 8px; }
+  ul.tight { margin: 6px 0 0; padding-left: 20px; }
+  ul.tight li { margin-bottom: 4px; }
+  @media (max-width: 620px) { .chart { height: 160px; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>Graphite <span>API Console</span></h1>
+  <div class="spacer"></div>
+  <div style="min-width:220px">
+    <label for="base">Backend</label>
+    <input type="text" id="base" value="">
+  </div>
+  <div style="min-width:150px">
+    <label for="apikey">API key</label>
+    <input type="password" id="apikey" value="" placeholder="required by this server" autocomplete="off">
+  </div>
+  <div>
+    <label for="mock">Mode</label>
+    <select id="mock"><option value="false">Live Nebius</option><option value="true">Mock fallback</option></select>
+  </div>
+  <div>
+    <label>Health</label>
+    <button class="ghost tiny" id="ping"><span class="dot" id="healthdot"></span> &nbsp;Ping</button>
+  </div>
+  <div>
+    <label>Theme</label>
+    <button class="ghost tiny" id="theme">Toggle</button>
+  </div>
+</header>
+
+<div id="authbanner" hidden style="margin:14px 0;padding:12px 16px;border-radius:8px;
+     border:1px solid #b3801e;background:rgba(179,128,30,.12);font-size:14px;line-height:1.5">
+  <strong>This server requires an API key.</strong>
+  Paste it into the <em>API key</em> box above, or every request below will return 401.
+</div>
+
+<!-- STEP 1 -->
+<section class="card">
+  <h2><span class="step-n">1</span> Interpret scenario &mdash; plain English to numbers</h2>
+  <label for="prompt">Describe the market disaster</label>
+  <textarea id="prompt" rows="2">Severe flash crash with illiquid order book and 8% drop in 5 minutes</textarea>
+  <div class="row" style="margin-top:10px">
+    <button id="btn-interpret">Interpret</button>
+    <button class="ghost tiny" data-preset="Severe flash crash with illiquid order book and 8% drop in 5 minutes">Flash crash</button>
+    <button class="ghost tiny" data-preset="Liquidity freeze where the order book completely evaporates for 10 minutes, spreads blow out, no directional move">Liquidity freeze</button>
+    <button class="ghost tiny" data-preset="Short squeeze, price gaps up 6% at the open and keeps grinding higher for 20 minutes">Short squeeze</button>
+    <button class="ghost tiny" data-preset="ECB emergency rate hike announcement: EUR/USD top-of-book spread widens from 0.8 pips to 65 pips within 300ms. Bid-side depth across the first 5 levels evaporates by 94% due to aggressive institutional market sell orders (toxic flow cascade), followed by a 450ms WebSocket feed freeze. Evaluate inventory skew calculation, adverse selection fill rates, and unhedged delta exposure during a crossed or inverted book state.">ECB / FX microstructure</button>
+    <div class="spacer"></div>
+    <span class="meta" id="meta-interpret"></span>
+  </div>
+  <div id="interp-out" hidden>
+    <p style="margin:14px 0 4px" id="interp-text"></p>
+    <div class="meta" id="interp-conf"></div>
+
+    <div id="ai-panel">
+      <div class="tiles" id="ai-tiles"></div>
+      <div class="chart-title">What the model understood</div>
+      <div id="coverage"></div>
+      <div id="reasoning-notes"></div>
+      <div class="chart-title" style="margin-top:16px">Event timeline</div>
+      <div id="timeline"></div>
+      <div id="adjustments"></div>
+    </div>
+
+    <details><summary>Derived legacy parameters (drive the fallback engine)</summary>
+      <div class="grid-params" id="params" style="margin-top:10px"></div>
+    </details>
+    <details><summary>Raw JSON</summary><pre class="code" id="interp-json"></pre></details>
+  </div>
+  <div class="err" id="err-interpret"></div>
+</section>
+
+<!-- STEP 2 -->
+<section class="card">
+  <h2><span class="step-n">2</span> Run the simulation &mdash; watch it break</h2>
+  <div class="row" style="margin-bottom:10px">
+    <button class="ghost tiny" data-code="naive">Load naive strategy</button>
+    <button class="ghost tiny" data-code="guarded">Load guarded strategy</button>
+    <button class="ghost tiny" data-code="buggy">Load crashing strategy</button>
+  </div>
+  <label for="code">Strategy code (statically analysed for safety controls &mdash; never executed)</label>
+  <textarea id="code" rows="7"></textarea>
+  <div class="row" style="margin-top:10px">
+    <button id="btn-sim">Run streaming (SSE)</button>
+    <button class="ghost" id="btn-sim-sync">Run instant (no stream)</button>
+    <div>
+      <label for="speed">Tick delay (ms)</label>
+      <input type="number" id="speed" value="25" min="0" max="500" style="width:90px">
+    </div>
+    <div class="spacer"></div>
+    <span class="meta" id="meta-sim"></span>
+  </div>
+  <div id="sim-out" hidden>
+    <div id="crash-banner" hidden></div>
+    <div class="tiles" id="tiles"></div>
+    <div class="chart-title">Equity</div>
+    <svg class="chart" id="chart-equity"></svg>
+    <div class="chart-title">Price</div>
+    <svg class="chart" id="chart-price"></svg>
+    <div class="chart-title" style="margin-top:14px">Market events</div>
+    <div class="log" id="log"></div>
+    <details><summary>Raw complete frame</summary><pre class="code" id="sim-json"></pre></details>
+  </div>
+  <div class="err" id="err-sim"></div>
+</section>
+
+<!-- STEP 3 -->
+<section class="card">
+  <h2><span class="step-n">3</span> Audit &mdash; why it failed</h2>
+  <div class="row">
+    <button id="btn-audit" disabled>Audit this run</button>
+    <div class="spacer"></div>
+    <span class="meta" id="meta-audit"></span>
+  </div>
+  <div id="audit-out" hidden>
+    <div class="row" style="margin:14px 0 8px; align-items:center">
+      <span class="chip" id="audit-verdict"></span>
+      <strong style="font-size:22px; letter-spacing:-0.02em" id="audit-score"></strong>
+      <span class="meta">/ 100</span>
+    </div>
+    <p style="margin:0 0 6px; font-weight:600" id="audit-headline"></p>
+    <p style="margin:0; color:var(--ink-2)" id="audit-narrative"></p>
+    <div id="audit-lists"></div>
+    <details><summary>Raw JSON</summary><pre class="code" id="audit-json"></pre></details>
+  </div>
+  <div class="err" id="err-audit"></div>
+</section>
+
+<!-- STEP 4 -->
+<section class="card">
+  <h2><span class="step-n">4</span> Auto-patch &mdash; and prove it helped</h2>
+  <div class="row">
+    <button id="btn-improve" disabled>Generate hardened strategy</button>
+    <button class="ghost" id="btn-compare" disabled>Re-run patched &amp; compare</button>
+    <div class="spacer"></div>
+    <span class="meta" id="meta-improve"></span>
+  </div>
+  <div id="improve-out" hidden>
+    <p style="margin:14px 0 8px; font-weight:600" id="improve-summary"></p>
+    <table id="rec-table"></table>
+    <div class="chart-title" style="margin-top:14px">Patched code</div>
+    <pre class="code" id="improve-code"></pre>
+  </div>
+  <div id="compare-out" hidden>
+    <div class="chart-title" style="margin-top:18px">Original vs patched &mdash; same crash</div>
+    <table id="cmp-table"></table>
+    <div class="chart-title" style="margin-top:14px">Equity, both variants</div>
+    <svg class="chart" id="chart-cmp"></svg>
+    <div class="legend">
+      <span><i style="background:var(--series-1)"></i>Original</span>
+      <span><i style="background:var(--series-2)"></i>Patched</span>
+    </div>
+  </div>
+  <div class="err" id="err-improve"></div>
+</section>
+
+<!-- STEP 5 -->
+<section class="card">
+  <h2><span class="step-n">5</span> Run history</h2>
+  <div class="row"><button class="ghost" id="btn-runs">Refresh</button></div>
+  <table id="runs-table" style="margin-top:12px"></table>
+  <div class="err" id="err-runs"></div>
+</section>
+
+<!-- STEP 6 -->
+<section class="card">
+  <h2><span class="step-n">6</span> Model benchmark &mdash; can it read an institutional prompt?</h2>
+  <div class="row">
+    <button class="ghost" id="btn-bench">Load results</button>
+    <div class="spacer"></div>
+    <span class="meta">regenerate: <code>python -m benchmarks.run</code></span>
+  </div>
+  <div id="bench-out" hidden>
+    <table id="bench-table" style="margin-top:12px"></table>
+    <div class="chart-title" style="margin-top:16px">Per-case scores</div>
+    <table id="bench-detail"></table>
+  </div>
+  <div class="err" id="err-bench"></div>
+</section>
+
+<p class="hint">Every request is logged in your browser console with full payloads. Latency shown per call is measured client-side, wall-clock.</p>
+</div>
+
+<div class="tip" id="tip"></div>
+
+<script>
+const NAIVE = `def on_tick(bar, book, account):
+    # Naive momentum breakout: no stop, no spread check, no sizing limit.
+    if bar.price > bar.rolling_high:
+        account.buy(100)
+`;
+const GUARDED = `import logging
+from dataclasses import dataclass
+from typing import Optional
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+logger = logging.getLogger(__name__)
+
+MAX_POSITION_SIZE = 10_000          
+STOP_LOSS_BPS = 50                  
+SPREAD_BPS = 100                    
+MIN_BOOK_DEPTH = 1_000              
+CIRCUIT_BREAKER_LOSS_BPS = 200      
+CIRCUIT_BREAKER_COOLDOWN_BARS = 10  
+
+@dataclass
+class State:
+    position: float = 0.0
+    entry_price: Optional[float] = None
+    session_high_pnl_bps: float = 0.0
+    session_low_pnl_bps: float = 0.0
+    circuit_broken: bool = False
+    circuit_breaker_remaining: int = 0
+    last_bar_index: Optional[int] = None
+
+_state = State()
+
+def _safe_mid_price(book) -> Optional[float]:
+    if book.bid is None or book.ask is None or book.bid <= 0 or book.ask <= 0:
+        return None
+    return 0.5 * (book.bid + book.ask)
+
+def _spread_bps(book) -> Optional[float]:
+    mid = _safe_mid_price(book)
+    if not mid: return None
+    return ((book.ask - book.bid) / mid) * 10_000
+
+def _book_depth(book) -> float:
+    try:
+        return float(book.depth)
+    except Exception:
+        return 0.0
+
+def _unrealised_pnl_bps(position: float, entry_price: Optional[float], mid: float) -> float:
+    if position == 0 or entry_price is None or entry_price <= 0 or mid <= 0:
+        return 0.0
+    return ((mid - entry_price) / entry_price) * 10_000 * (1.0 if position > 0 else -1.0)
+
+def _halt_if_circuit_breaker() -> bool:
+    if _state.circuit_broken:
+        if _state.circuit_breaker_remaining > 0:
+            _state.circuit_breaker_remaining -= 1
+            return True
+        _state.circuit_broken = False
+    return False
+
+def _update_circuit_breaker(pnl_bps: float) -> None:
+    _state.session_high_pnl_bps = max(_state.session_high_pnl_bps, pnl_bps)
+    _state.session_low_pnl_bps = min(_state.session_low_pnl_bps, pnl_bps)
+    if pnl_bps <= -CIRCUIT_BREAKER_LOSS_BPS and not _state.circuit_broken:
+        _state.circuit_broken = True
+        _state.circuit_breaker_remaining = CIRCUIT_BREAKER_COOLDOWN_BARS
+
+def _flatten(account, reason: str) -> None:
+    if _state.position == 0: return
+    try:
+        account.flatten()
+    except Exception:
+        pass
+    _state.position = 0.0
+    _state.entry_price = None
+
+def _enter_long(account, mid: float, size: float) -> None:
+    desired = min(size, MAX_POSITION_SIZE)
+    if desired <= 0: return
+    account.buy(desired)
+    _state.position = desired
+    _state.entry_price = mid
+
+def on_tick(bar, book, account) -> None:
+    try:
+        bar_index = bar.index
+        price = bar.price
+    except Exception as exc:
+        logger.exception("Bar object error: %s", exc)
+        return
+
+    if price is None or price <= 0: return
+    if bar_index == _state.last_bar_index: return
+    _state.last_bar_index = bar_index
+
+    mid = _safe_mid_price(book)
+    if mid is None: return
+
+    spread_bps = _spread_bps(book)
+    if spread_bps is None or spread_bps > SPREAD_BPS: return
+
+    depth = _book_depth(book)
+    if depth < MIN_BOOK_DEPTH: return
+
+    unrealised_bps = _unrealised_pnl_bps(_state.position, _state.entry_price, mid)
+    _update_circuit_breaker(unrealised_bps)
+
+    if _state.position != 0 and unrealised_bps <= -STOP_LOSS_BPS:
+        _flatten(account, f"stop loss triggered at {unrealised_bps:.2f} bps")
+        return
+
+    if _halt_if_circuit_breaker(): return
+
+    if _state.position == 0:
+        _enter_long(account, mid, 1000.0)
+`;
+
+const BUGGY = `import math
+import time
+from dataclasses import dataclass, field
+from typing import Dict, List, Optional
+
+@dataclass
+class OrderBookLevel:
+    price: float
+    size: float
+
+@dataclass
+class OrderBook:
+    timestamp: float
+    bids: List[OrderBookLevel]
+    asks: List[OrderBookLevel]
+
+    @property
+    def best_bid(self) -> float:
+        return self.bids[0].price if self.bids else 0.0
+
+    @property
+    def best_ask(self) -> float:
+        return self.asks[0].price if self.asks else float("inf")
+
+    @property
+    def total_bid_depth(self) -> float:
+        return sum(level.size for level in self.bids[:5])
+
+    @property
+    def total_ask_depth(self) -> float:
+        return sum(level.size for level in self.asks[:5])
+
+class FlashCrashVulnerableMM:
+    def __init__(self, target_inventory: float = 0.0, risk_aversion: float = 0.1):
+        self.gamma = risk_aversion
+        self.target_inv = target_inventory
+        self.current_inventory = 0.0
+        self.cash = 1_000_000.0
+        self.realized_pnl = 0.0
+
+    def compute_quotes(self, book: OrderBook, time_remaining: float = 1.0) -> Dict:
+        if not book.bids or not book.asks:
+            raise RuntimeError("Order book completely empty: Exchange Feed Halt")
+
+        mid_price = (book.best_bid + book.best_ask) / 2.0
+        bid_depth = book.total_bid_depth
+        ask_depth = book.total_ask_depth
+        reservation_price = mid_price - (self.current_inventory - self.target_inv) * self.gamma
+
+        # BUG 1: During flash illiquidity, bid_depth hits 0.0 -> ZeroDivisionError
+        liquidity_elasticity = bid_depth / (ask_depth + 1e-9)
+        half_spread = (1.0 / self.gamma) * math.log(1.0 + (1.0 / bid_depth))
+
+        optimal_bid = min(reservation_price - half_spread, book.best_bid)
+        optimal_ask = max(reservation_price + half_spread, book.best_ask)
+        depth_imbalance = (ask_depth - bid_depth) / (bid_depth + ask_depth)
+        position_scale = 1.0 / (bid_depth / 500.0)
+        quote_size = max(10, int(100 * position_scale * (1.0 + depth_imbalance)))
+
+        return {
+            "bid_price": round(optimal_bid, 4),
+            "ask_price": round(optimal_ask, 4),
+            "quote_size": quote_size,
+            "mid_price": mid_price,
+            "bid_depth": bid_depth,
+        }
+
+    def on_market_fill(self, fill_price: float, fill_size: float, side: str):
+        if side == "BUY":
+            self.current_inventory += fill_size
+            self.cash -= fill_price * fill_size
+        elif side == "SELL":
+            self.current_inventory -= fill_size
+            self.cash += fill_price * fill_size
+`;
+
+const CODE_PRESETS = { naive: NAIVE, guarded: GUARDED, buggy: BUGGY };
+
+const PARAM_FIELDS = [
+  ["shockMagnitudePct", "Shock %"], ["volatilityMultiplier", "Vol multiple"],
+  ["liquidityFactor", "Liquidity factor"], ["spreadBps", "Spread (bps)"],
+  ["gapPct", "Gap %"], ["durationMinutes", "Duration (min)"],
+  ["shockDurationMinutes", "Shock (min)"], ["recoveryMinutes", "Recovery (min)"],
+];
+
+const $ = (id) => document.getElementById(id);
+const state = { scenario: null, run: null, audit: null, improved: null, improvedRun: null };
+
+$("base").value = location.origin;
+/* Remember the key per browser so it survives a reload. Storage can throw in a
+   private window, and the console must still work without it. */
+try { $("apikey").value = localStorage.getItem("stresstest-api-key") || ""; } catch (e) {}
+$("apikey").addEventListener("change", () => {
+  try { localStorage.setItem("stresstest-api-key", $("apikey").value.trim()); } catch (e) {}
+  refreshAuthBanner();
+});
+
+/* Say so up front rather than letting every button fail with a bare 401. */
+async function refreshAuthBanner() {
+  try {
+    const health = await (await fetch(base() + "/health")).json();
+    $("authbanner").hidden = !(health.authRequired && !$("apikey").value.trim());
+  } catch (e) {
+    $("authbanner").hidden = true;
+  }
+}
+refreshAuthBanner();
+const base = () => $("base").value.replace(/\/$/, "");
+const mock = () => $("mock").value === "true";
+const qs = () => (mock() ? "?use_mock=true" : "");
+
+const fmtMoney = (n) => (n < 0 ? "-" : "") + "$" + Math.abs(n).toLocaleString("en-US", { maximumFractionDigits: 0 });
+const fmtPct = (n) => n.toFixed(2) + "%";
+
+function setErr(id, e) { $(id).textContent = e ? String(e.message || e) : ""; }
+function setMeta(id, ms, extra) { $(id).textContent = ms == null ? "" : `${Math.round(ms)} ms${extra ? " · " + extra : ""}`; }
+
+/* The key is only needed when the server sets STRESSTEST_API_KEY; sending it
+   otherwise is harmless, so it is always attached. */
+const apiKey = () => ($("apikey") ? $("apikey").value.trim() : "");
+function authed(headers) {
+  const key = apiKey();
+  return key ? { ...(headers || {}), "X-API-Key": key } : { ...(headers || {}) };
+}
+
+async function call(path, options, metaId) {
+  const t0 = performance.now();
+  const opts = { ...(options || {}) };
+  opts.headers = authed(opts.headers);
+  const res = await fetch(base() + path, opts);
+  const ms = performance.now() - t0;
+  if (res.status === 401) {
+    refreshAuthBanner();
+    throw new Error(apiKey()
+      ? "401 — that API key is not accepted by this server."
+      : "401 — this server needs an API key. Paste it in the API key box above.");
+  }
+  if (!res.ok) throw new Error(`${res.status} ${res.statusText} — ${(await res.text()).slice(0, 220)}`);
+  const json = await res.json();
+  console.log(path, json);
+  if (metaId) setMeta(metaId, ms);
+  return json;
+}
+const postJSON = (body) => ({ method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+
+/* ---------- charts ---------- */
+const TIP = $("tip");
+
+function drawLine(svg, series, fmtY) {
+  const W = svg.clientWidth || 800, H = svg.clientHeight || 190;
+  const P = { t: 12, r: 14, b: 22, l: 58 };
+  const all = series.flatMap((s) => s.values).filter((v) => Number.isFinite(v));
+  if (!all.length) { svg.innerHTML = ""; return; }
+  let min = Math.min(...all), max = Math.max(...all);
+  if (min === max) { min -= 1; max += 1; }
+  const pad = (max - min) * 0.08; min -= pad; max += pad;
+  const n = Math.max(...series.map((s) => s.values.length));
+  const X = (i) => P.l + (i / Math.max(1, n - 1)) * (W - P.l - P.r);
+  const Y = (v) => P.t + (1 - (v - min) / (max - min)) * (H - P.t - P.b);
+
+  const ticks = 4;
+  let g = "";
+  for (let k = 0; k <= ticks; k++) {
+    const v = min + ((max - min) * k) / ticks, y = Y(v);
+    g += `<line x1="${P.l}" y1="${y}" x2="${W - P.r}" y2="${y}" stroke="var(--grid)" stroke-width="1"/>`;
+    g += `<text x="${P.l - 8}" y="${y + 4}" text-anchor="end" font-size="10.5" fill="var(--ink-muted)" style="font-variant-numeric:tabular-nums">${fmtY(v)}</text>`;
+  }
+  g += `<line x1="${P.l}" y1="${H - P.b}" x2="${W - P.r}" y2="${H - P.b}" stroke="var(--axis)" stroke-width="1"/>`;
+
+  for (const s of series) {
+    const d = s.values.map((v, i) => `${i ? "L" : "M"}${X(i).toFixed(1)},${Y(v).toFixed(1)}`).join("");
+    g += `<path d="${d}" fill="none" stroke="${s.color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
+    const last = s.values.length - 1;
+    if (last >= 0) g += `<circle cx="${X(last)}" cy="${Y(s.values[last])}" r="3.5" fill="${s.color}" stroke="var(--surface-1)" stroke-width="2"/>`;
+  }
+  g += `<line id="cross" x1="0" y1="${P.t}" x2="0" y2="${H - P.b}" stroke="var(--axis)" stroke-width="1" opacity="0"/>`;
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  svg.innerHTML = g;
+
+  svg.onpointermove = (ev) => {
+    const r = svg.getBoundingClientRect();
+    const i = Math.round(((ev.clientX - r.left) / r.width * W - P.l) / (W - P.l - P.r) * (n - 1));
+    if (i < 0 || i >= n) return;
+    const cross = svg.querySelector("#cross");
+    if (cross) { cross.setAttribute("x1", X(i)); cross.setAttribute("x2", X(i)); cross.setAttribute("opacity", "1"); }
+    TIP.innerHTML = series.filter((s) => Number.isFinite(s.values[i]))
+      .map((s) => `<div><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${s.color};margin-right:6px"></span>${s.name}: <strong>${fmtY(s.values[i])}</strong></div>`)
+      .join("") + `<div style="color:var(--ink-muted);margin-top:3px">tick ${i}</div>`;
+    TIP.style.opacity = "1";
+    TIP.style.left = Math.min(ev.clientX + 14, window.innerWidth - TIP.offsetWidth - 10) + "px";
+    TIP.style.top = ev.clientY - 10 + "px";
+  };
+  svg.onpointerleave = () => {
+    TIP.style.opacity = "0";
+    const cross = svg.querySelector("#cross");
+    if (cross) cross.setAttribute("opacity", "0");
+  };
+}
+
+/* ---------- step 1 ---------- */
+function renderParams(p) {
+  $("params").innerHTML = PARAM_FIELDS.map(([k, label]) =>
+    `<div><label for="p-${k}">${label}</label><input type="number" step="any" id="p-${k}" value="${p[k]}"></div>`).join("");
+}
+function readParams() {
+  const out = {};
+  for (const [k] of PARAM_FIELDS) out[k] = parseFloat($("p-" + k).value);
+  return out;
+}
+
+const STATUS_META = {
+  modelled:     { chip: "chip-low",      label: "modelled" },
+  approximated: { chip: "chip-medium",   label: "approximated" },
+  unsupported:  { chip: "chip-critical", label: "unsupported" },
+};
+
+function renderAiPanel(s) {
+  const panel = $("ai-panel");
+  if (!s.script) { panel.hidden = true; return; }
+  panel.hidden = false;
+  const sc = s.script, r = s.reasoning || {};
+  const counts = { modelled: 0, approximated: 0, unsupported: 0 };
+  (s.requirements || []).forEach((q) => counts[q.status]++);
+  const steps = Math.floor(sc.durationMs / sc.resolutionMs);
+
+  $("ai-tiles").innerHTML = [
+    ["Coverage", (s.coveragePct ?? 0) + "%"],
+    ["Requirements", `${counts.modelled}/${(s.requirements || []).length}`],
+    ["Instrument", sc.instrument.symbol],
+    ["Resolution", sc.resolutionMs + " ms"],
+    ["Steps", steps],
+    ["Events", sc.events.length],
+    ["Confidence", s.confidence],
+    ["Model", (s.model || "").split("/").pop() || "—"],
+  ].map(([k, v]) => `<div class="tile"><div class="k">${k}</div><div class="v" style="font-size:16px">${v}</div></div>`).join("");
+
+  $("coverage").innerHTML = "<table>" + (s.requirements || []).map((q) => {
+    const m = STATUS_META[q.status];
+    return `<tr><td style="width:1%"><span class="chip ${m.chip}">${m.label}</span></td>
+      <td><strong>${q.quote}</strong><br>
+      <span style="color:var(--ink-2)">${q.mappedTo ? "&rarr; " + q.mappedTo + " &mdash; " : ""}${q.note}</span></td></tr>`;
+  }).join("") + "</table>";
+
+  $("reasoning-notes").innerHTML = !r.instrumentReasoning ? "" :
+    `<ul class="tight" style="margin-top:10px">
+       <li><strong>Instrument:</strong> ${r.instrumentReasoning}</li>
+       <li><strong>Resolution:</strong> ${r.resolutionReasoning}</li>
+     </ul>`;
+
+  const span = Math.max(1, sc.durationMs);
+  $("timeline").innerHTML = sc.events.slice().sort((a, b) => a.atMs - b.atMs).map((ev) => {
+    const width = Math.max(1.2, ((ev.overMs || ev.durationMs || 0) / span) * 100);
+    const left = (ev.atMs / span) * 100;
+    const detail = Object.entries(ev)
+      .filter(([k]) => !["type", "atMs", "overMs", "durationMs"].includes(k))
+      .map(([k, v]) => `${k}=${v}`).join(" ");
+    return `<div style="display:flex; align-items:center; gap:10px; margin-bottom:5px">
+      <div style="flex:0 0 150px; font-size:12px; font-weight:600">${ev.type}</div>
+      <div style="flex:1; position:relative; height:16px; background:var(--code-bg); border-radius:3px">
+        <div title="${ev.atMs}ms" style="position:absolute; left:${left}%; width:${width}%; top:0; bottom:0;
+             background:var(--series-1); border-radius:3px; min-width:3px"></div>
+      </div>
+      <div class="meta" style="flex:0 0 190px">@${ev.atMs}ms ${detail}</div>
+    </div>`;
+  }).join("");
+
+  $("adjustments").innerHTML = !(s.adjustments || []).length ? "" :
+    `<div class="chart-title" style="margin-top:14px">Auto-corrections applied</div>
+     <ul class="tight">${s.adjustments.map((a) => `<li style="color:var(--ink-2)">${a}</li>`).join("")}</ul>`;
+}
+
+$("btn-interpret").onclick = async () => {
+  setErr("err-interpret"); $("btn-interpret").disabled = true;
+  $("meta-interpret").textContent = "thinking…";
+  try {
+    const s = await call("/api/scenarios/interpret" + qs(), postJSON({ prompt: $("prompt").value }), "meta-interpret");
+    state.scenario = s;
+    $("interp-text").textContent = s.interpretation;
+    $("interp-conf").textContent = `confidence ${s.confidence}`;
+    renderParams(s.params);
+    renderAiPanel(s);
+    $("interp-json").textContent = JSON.stringify(s, null, 2);
+    $("interp-out").hidden = false;
+  } catch (e) { setErr("err-interpret", e); }
+  $("btn-interpret").disabled = false;
+};
+document.querySelectorAll("[data-preset]").forEach((b) => b.onclick = () => { $("prompt").value = b.dataset.preset; });
+document.querySelectorAll("[data-code]").forEach((b) => b.onclick = () => { $("code").value = CODE_PRESETS[b.dataset.code]; });
+$("code").value = NAIVE;
+
+/* ---------- step 2 ---------- */
+function tiles(m) {
+  const items = [
+    ["P&L", fmtMoney(m.pnl)], ["P&L %", fmtPct(m.pnlPct)],
+    ["Max drawdown", fmtPct(m.maxDrawdownPct)], ["Trades", m.trades],
+    ["Slippage", m.slippageBps.toFixed(1) + " bps"], ["Sharpe", m.sharpe.toFixed(2)],
+    ["Exposure", m.exposureMinutes + " min"], ["Final equity", fmtMoney(m.finalEquity)],
+  ];
+  $("tiles").innerHTML = items.map(([k, v]) =>
+    `<div class="tile"><div class="k">${k}</div><div class="v">${v}</div></div>`).join("");
+}
+function logEvent(e) {
+  const map = { info: "info", good: "good", warn: "warn", critical: "critical" };
+  $("log").insertAdjacentHTML("beforeend",
+    `<div class="log-line"><time>${e.clock}</time><span class="sev sev-${map[e.severity]}">${e.severity.toUpperCase()}</span><span>${e.message}</span></div>`);
+}
+function scenarioPayload() {
+  const s = state.scenario;
+  return {
+    id: s ? s.id : "custom",
+    name: s ? s.name : "Custom Scenario",
+    params: s ? readParams() : null,
+    script: s && s.script ? s.script : null,
+  };
+}
+function requireScenario() {
+  if (!state.scenario) throw new Error("Run step 1 first — the simulation needs scenario parameters.");
+}
+
+function showCrash(err) {
+  const el = $("crash-banner");
+  if (!err) { el.hidden = true; return; }
+  el.hidden = false;
+  el.innerHTML =
+    `<div style="border:1px solid var(--critical); border-left-width:4px; border-radius:8px; padding:12px 14px; margin-bottom:6px;
+                 background:color-mix(in srgb, var(--critical) 8%, transparent)">
+       <strong style="color:var(--critical)">Strategy crashed: ${err.type}</strong>
+       <div style="margin-top:4px; color:var(--ink-2)">${err.message}</div>
+       <div class="meta" style="margin-top:4px">${err.index == null ? "before execution started" : "at bar index " + err.index} &middot; trading halted, position frozen</div>
+     </div>`;
+}
+
+function afterRun(run, equity, price) {
+  state.run = run;
+  showCrash(run.strategyError);
+  tiles(run.metrics);
+  drawLine($("chart-equity"), [{ name: "Equity", values: equity, color: "var(--series-1)" }], (v) => "$" + Math.round(v / 1000) + "k");
+  drawLine($("chart-price"), [{ name: "Price", values: price, color: "var(--series-1)" }], (v) => v.toFixed(0));
+  $("sim-json").textContent = JSON.stringify({ ...run, series: `[${run.series.length} ticks omitted]` }, null, 2);
+  $("btn-audit").disabled = false;
+  $("btn-improve").disabled = true;
+  $("btn-compare").disabled = true;
+  $("audit-out").hidden = true; $("improve-out").hidden = true; $("compare-out").hidden = true;
+}
+
+$("btn-sim").onclick = async () => {
+  setErr("err-sim");
+  try {
+    requireScenario();
+    $("btn-sim").disabled = true; $("sim-out").hidden = false;
+    $("log").innerHTML = ""; showCrash(null); setMeta("meta-sim", null);
+    const equity = [], price = [];
+    const t0 = performance.now();
+    const streamOpts = postJSON({ strategy: { name: "console_strategy", code: $("code").value }, scenario: scenarioPayload(), variant: "original" });
+    streamOpts.headers = authed(streamOpts.headers);
+    const res = await fetch(`${base()}/api/simulations?tick_delay_ms=${$("speed").value}`, streamOpts);
+    if (res.status === 401) { refreshAuthBanner(); throw new Error("401 — check the API key box above."); }
+    if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+    const reader = res.body.getReader(), dec = new TextDecoder();
+    let buf = "", frames = 0;
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      const parts = buf.split("\n\n"); buf = parts.pop();
+      for (const part of parts) {
+        const ev = /^event: (.+)$/m.exec(part)?.[1];
+        const data = JSON.parse(/^data: (.+)$/m.exec(part)[1]);
+        if (ev === "tick") {
+          equity.push(data.equity); price.push(data.price); frames++;
+          tiles({ pnl: data.pnl, pnlPct: (data.pnl / 1e6) * 100, maxDrawdownPct: data.drawdownPct, trades: data.trades,
+                  slippageBps: data.spreadBps, sharpe: 0, exposureMinutes: data.index, finalEquity: data.equity });
+          drawLine($("chart-equity"), [{ name: "Equity", values: equity, color: "var(--series-1)" }], (v) => "$" + Math.round(v / 1000) + "k");
+          drawLine($("chart-price"), [{ name: "Price", values: price, color: "var(--series-1)" }], (v) => v.toFixed(0));
+          setMeta("meta-sim", performance.now() - t0, `${frames}/${data.total} ticks · ${data.phase}`);
+        } else if (ev === "market_event") { logEvent(data); }
+        else if (ev === "complete") { afterRun(data, equity, price); setMeta("meta-sim", performance.now() - t0, `${data.series.length} ticks · ${data.id}`); }
+      }
+    }
+  } catch (e) { setErr("err-sim", e); }
+  $("btn-sim").disabled = false;
+};
+
+$("btn-sim-sync").onclick = async () => {
+  setErr("err-sim");
+  try {
+    requireScenario();
+    $("btn-sim-sync").disabled = true; $("sim-out").hidden = false; $("log").innerHTML = ""; showCrash(null);
+    const run = await call("/api/simulations/sync",
+      postJSON({ strategy: { name: "console_strategy", code: $("code").value }, scenario: scenarioPayload(), variant: "original" }), "meta-sim");
+    run.events.forEach(logEvent);
+    afterRun(run, run.series.map((t) => t.equity), run.series.map((t) => t.price));
+  } catch (e) { setErr("err-sim", e); }
+  $("btn-sim-sync").disabled = false;
+};
+
+/* ---------- step 3 ---------- */
+$("btn-audit").onclick = async () => {
+  setErr("err-audit"); $("btn-audit").disabled = true;
+  try {
+    const a = await call("/api/audits" + qs(), postJSON({ ...state.run, code: $("code").value, scenario: scenarioPayload() }), "meta-audit");
+    state.audit = a;
+    const v = $("audit-verdict");
+    v.textContent = a.verdict.toUpperCase(); v.className = "chip chip-" + a.verdict;
+    $("audit-score").textContent = a.score;
+    $("audit-headline").textContent = a.headline;
+    $("audit-narrative").textContent = a.narrative;
+    const list = (title, arr) => !arr.length ? "" :
+      `<div class="chart-title" style="margin-top:14px">${title}</div><table>` + arr.map((w) =>
+        `<tr><td style="width:1%"><span class="chip chip-${w.severity}">${w.severity}</span></td><td><strong>${w.title}</strong><br><span style="color:var(--ink-2)">${w.detail}</span></td></tr>`).join("") + "</table>";
+    $("audit-lists").innerHTML =
+      (a.strengths.length ? `<div class="chart-title" style="margin-top:14px">Strengths</div><ul class="tight">${a.strengths.map((s) => `<li>${s}</li>`).join("")}</ul>` : "")
+      + list("Weaknesses", a.weaknesses) + list("Failure modes", a.failureModes);
+    $("audit-json").textContent = JSON.stringify(a, null, 2);
+    $("audit-out").hidden = false;
+    $("btn-improve").disabled = false;
+  } catch (e) { setErr("err-audit", e); }
+  $("btn-audit").disabled = false;
+};
+
+/* ---------- step 4 ---------- */
+$("btn-improve").onclick = async () => {
+  setErr("err-improve"); $("btn-improve").disabled = true;
+  try {
+    const imp = await call("/api/strategies/improve" + qs(), postJSON({ code: $("code").value, audit: state.audit }), "meta-improve");
+    state.improved = imp;
+    $("improve-summary").textContent = imp.summary;
+    $("rec-table").innerHTML = "<tr><th>Change</th><th>Problem it fixes</th><th>Impact</th></tr>" +
+      imp.recommendations.map((r) => `<tr><td><strong>${r.title}</strong><br><span style="color:var(--ink-2)">${r.change}</span></td><td style="color:var(--ink-2)">${r.problem}</td><td style="color:var(--ink-2)">${r.impact}</td></tr>`).join("");
+    $("improve-code").textContent = imp.code;
+    $("improve-out").hidden = false;
+    $("btn-compare").disabled = false;
+  } catch (e) { setErr("err-improve", e); }
+  $("btn-improve").disabled = false;
+};
+
+$("btn-compare").onclick = async () => {
+  setErr("err-improve"); $("btn-compare").disabled = true;
+  try {
+    const run2 = await call("/api/simulations/sync",
+      postJSON({ strategy: { name: "console_strategy_hardened", code: state.improved.code }, scenario: scenarioPayload(), variant: "improved" }), "meta-improve");
+    state.improvedRun = run2;
+    const a = state.run.metrics, b = run2.metrics;
+    const better = (x, y, lowerIsBetter = true) => {
+      const d = lowerIsBetter ? x - y : y - x;
+      return d > 0 ? `<span style="color:var(--good);font-weight:600">improved</span>` : d < 0 ? `<span style="color:var(--critical)">worse</span>` : "—";
+    };
+    $("cmp-table").innerHTML =
+      `<tr><th>Metric</th><th class="num">Original</th><th class="num">Patched</th><th>Direction</th></tr>
+       <tr><td>P&amp;L</td><td class="num">${fmtMoney(a.pnl)}</td><td class="num">${fmtMoney(b.pnl)}</td><td>${better(-a.pnl, -b.pnl)}</td></tr>
+       <tr><td>P&amp;L %</td><td class="num">${fmtPct(a.pnlPct)}</td><td class="num">${fmtPct(b.pnlPct)}</td><td>${better(-a.pnlPct, -b.pnlPct)}</td></tr>
+       <tr><td>Max drawdown</td><td class="num">${fmtPct(a.maxDrawdownPct)}</td><td class="num">${fmtPct(b.maxDrawdownPct)}</td><td>${better(a.maxDrawdownPct, b.maxDrawdownPct)}</td></tr>
+       <tr><td>Trades</td><td class="num">${a.trades}</td><td class="num">${b.trades}</td><td>—</td></tr>
+       <tr><td>Exposure</td><td class="num">${a.exposureMinutes} min</td><td class="num">${b.exposureMinutes} min</td><td>${better(a.exposureMinutes, b.exposureMinutes)}</td></tr>`;
+    drawLine($("chart-cmp"), [
+      { name: "Original", values: state.run.series.map((t) => t.equity), color: "var(--series-1)" },
+      { name: "Patched", values: run2.series.map((t) => t.equity), color: "var(--series-2)" },
+    ], (v) => "$" + Math.round(v / 1000) + "k");
+    $("compare-out").hidden = false;
+    loadRuns();
+  } catch (e) { setErr("err-improve", e); }
+  $("btn-compare").disabled = false;
+};
+
+/* ---------- step 5 ---------- */
+async function loadRuns() {
+  setErr("err-runs");
+  try {
+    const runs = await call("/api/runs", {}, null);
+    $("runs-table").innerHTML = !runs.length ? "<tr><td class='meta'>No runs yet.</td></tr>" :
+      "<tr><th>Run</th><th>Strategy</th><th>Scenario</th><th>Verdict</th><th class='num'>P&amp;L</th><th>At</th></tr>" +
+      runs.map((r) => `<tr><td>${r.id}</td><td>${r.strategyName}</td><td>${r.scenarioName}</td><td><span class="chip chip-${r.verdict}">${r.verdict}</span></td><td class="num">${fmtMoney(r.pnl)}</td><td class="meta">${r.at}</td></tr>`).join("");
+  } catch (e) { setErr("err-runs", e); }
+}
+$("btn-runs").onclick = loadRuns;
+
+/* ---------- chrome ---------- */
+$("ping").onclick = async () => {
+  const dot = $("healthdot");
+  try { await call("/health", {}, null); dot.className = "dot up"; }
+  catch { dot.className = "dot down"; }
+};
+$("theme").onclick = () => {
+  const dark = document.documentElement.dataset.theme === "dark";
+  document.documentElement.dataset.theme = dark ? "light" : "dark";
+  if (state.run) {
+    drawLine($("chart-equity"), [{ name: "Equity", values: state.run.series.map((t) => t.equity), color: "var(--series-1)" }], (v) => "$" + Math.round(v / 1000) + "k");
+    drawLine($("chart-price"), [{ name: "Price", values: state.run.series.map((t) => t.price), color: "var(--series-1)" }], (v) => v.toFixed(0));
+  }
+};
+addEventListener("resize", () => {
+  if (!state.run) return;
+  drawLine($("chart-equity"), [{ name: "Equity", values: state.run.series.map((t) => t.equity), color: "var(--series-1)" }], (v) => "$" + Math.round(v / 1000) + "k");
+  drawLine($("chart-price"), [{ name: "Price", values: state.run.series.map((t) => t.price), color: "var(--series-1)" }], (v) => v.toFixed(0));
+});
+
+
+async function loadBench() {
+  setErr("err-bench");
+  try {
+    const d = await call("/api/benchmark", {}, null);
+    $("bench-out").hidden = false;
+    $("bench-table").innerHTML =
+      "<tr><th>Model</th><th class='num'>Score</th><th class='num'>Params</th><th class='num'>Events</th>" +
+      "<th class='num'>Instrument</th><th class='num'>Resolution</th><th class='num'>Reqs</th><th class='num'>Latency</th></tr>" +
+      d.models.slice().sort((a, b) => b.score - a.score).map((m, i) =>
+        `<tr><td>${i === 0 ? "<strong>" + m.model + "</strong>" : m.model}</td>
+         <td class="num"><strong>${m.score}</strong></td><td class="num">${m.param_accuracy}%</td>
+         <td class="num">${m.event_recall}%</td><td class="num">${m.instrument_acc}%</td>
+         <td class="num">${m.resolution_acc}%</td><td class="num">${m.avg_requirements}</td>
+         <td class="num">${(m.avg_latency_ms / 1000).toFixed(1)}s</td></tr>`).join("");
+
+    const models = d.models.map((m) => m.model);
+    $("bench-detail").innerHTML =
+      "<tr><th>Case</th>" + models.map((m) => `<th class='num'>${m.split("/").pop()}</th>`).join("") + "</tr>" +
+      d.cases.map((c) => {
+        const cells = models.map((m) => {
+          const r = d.detail.find((x) => x.case === c && x.model === m);
+          if (!r) return "<td class='num'>—</td>";
+          const colour = r.score >= 99 ? "var(--good)" : r.score >= 90 ? "var(--ink-1)" : "var(--critical)";
+          const miss = r.param_misses && r.param_misses.length ? ` title="${r.param_misses.join(" | ")}"` : "";
+          return `<td class="num"${miss} style="color:${colour}">${r.score}</td>`;
+        }).join("");
+        return `<tr><td>${c}</td>${cells}</tr>`;
+      }).join("");
+  } catch (e) { setErr("err-bench", e); }
+}
+$("btn-bench").onclick = loadBench;
+
+$("ping").click();
+loadRuns();
+</script>
+</body>
+</html>
