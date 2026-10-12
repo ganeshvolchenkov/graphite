@@ -1,6 +1,6 @@
 <div align="center">
 
-# ⚡ StressTest
+# ⚡ Graphite
 
 ### Stop backtesting on the past. Stress-test against the unknown.
 
@@ -12,7 +12,7 @@ An AI market simulator that turns a plain-English shock — *"ECB emergency hike
 ![Tailwind](https://img.shields.io/badge/Tailwind-4-06B6D4?logo=tailwindcss&logoColor=white)
 ![Nebius](https://img.shields.io/badge/LLM-Nebius%20Token%20Factory-7C5CFF)
 
-<img src="frontend/public/dashboard.png" alt="StressTest dashboard: strategy editor on the left, attack-vector panel on the right" width="860">
+<img src="frontend/public/dashboard.png" alt="Graphite dashboard: strategy editor on the left, attack-vector panel on the right" width="860">
 
 </div>
 
@@ -22,7 +22,7 @@ An AI market simulator that turns a plain-English shock — *"ECB emergency hike
 
 Quant strategies are validated on historical data, but the events that blow them up — flash crashes, liquidity freezes, venue outages, feed stalls — are precisely the ones history doesn't contain enough of. A strategy that looks great in backtest can divide by zero when volume hits 0, or loop forever when a websocket freezes.
 
-## What StressTest does
+## What Graphite does
 
 1. **Interpret** — an LLM reads your scenario and compiles it into a structured *market script*: typed events (shocks, volatility regimes, liquidity withdrawal, spread widening, halts, outages…) with real parameters.
 2. **Simulate** — a deterministic engine plays that script out as a tick-by-tick order book, streaming every tick and market event to the UI over SSE.

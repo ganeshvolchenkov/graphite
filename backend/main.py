@@ -16,7 +16,7 @@ from services import audit_code_and_generate_diff, generate_synthetic_market_tap
 load_dotenv()
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
 
-app = FastAPI(title="StressTest API")
+app = FastAPI(title="Graphite API")
 
 # Order matters: the last middleware added is the outermost, and CORS has to
 # wrap the auth check so a 401 still carries the CORS headers. Without that the
