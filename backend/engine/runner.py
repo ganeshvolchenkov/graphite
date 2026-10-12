@@ -122,7 +122,7 @@ def simulate_script(
 ) -> tuple[list[Tick], list[MarketEvent], Metrics, GuardProfile, ExecutionResult, list[dict]]:
     guards = detect_guards(code)
     rows = build_book_path(script, seed)
-    execution = run_strategy(code, rows)
+    execution = run_strategy(code, rows, script.instrument.contract_size)
 
     ticks, max_drawdown, returns, exposure = _build_ticks(rows, execution)
 

@@ -53,14 +53,14 @@ def self_check() -> dict:
     }
 
 
-def run_strategy(code: str, rows: list[dict]) -> ExecutionResult:
+def run_strategy(code: str, rows: list[dict], contract_size: float = 1.0) -> ExecutionResult:
     """Execute the strategy in a separate process with a hard wall-clock limit.
 
     Isolation is demo-grade: separate process, stripped builtins, no __import__, timeout.
     It stops careless or crashing strategies from touching the API process. It is NOT a
     hardened boundary against a determined attacker — that needs container isolation.
     """
-    payload = json.dumps({"code": code, "rows": rows})
+    payload = json.dumps({"code": code, "rows": rows, "contract_size": contract_size})
 
     try:
         completed = subprocess.run(

@@ -1,6 +1,6 @@
 """Strategy execution worker. Runs in an isolated subprocess, never in the API process.
 
-Reads {code, rows} as JSON on stdin, writes {ticks, fills, quotes, stdout, error} on
+Reads {code, rows, contract_size} as JSON on stdin, writes {ticks, fills, quotes, stdout, error} on
 stdout. The strategy namespace comes from safeexec (real Python minus filesystem and
 process access, with an import allowlist). Anything the strategy prints is captured so it
 cannot corrupt the JSON channel.
@@ -74,7 +74,15 @@ class Book:
 
 
 class Account:
-    def __init__(self):
+    """Cash moves by size * price * contract_size.
+
+    contract_size is what one unit of `size` actually controls: 1 for a share,
+    10,000 for a standard FX lot. Ignoring it understates FX P&L by four orders
+    of magnitude and leaves the equity curve looking flat.
+    """
+
+    def __init__(self, contract_size=1.0):
+        self.contract_size = float(contract_size) or 1.0
         self.equity = START_EQUITY
         self.cash = START_EQUITY
         self.position = 0.0
@@ -93,7 +101,7 @@ class Account:
 
     @property
     def unhedged_delta(self):
-        return round(self.position * self._row["price"], 2) if self._row else 0.0
+        return round(self.position * self._row["price"] * self.contract_size, 2) if self._row else 0.0
 
     @property
     def adverse_fill_rate(self):
@@ -116,7 +124,7 @@ class Account:
         if size <= 0:
             return
         price = self._cross_price("buy")
-        self.cash -= size * price
+        self.cash -= size * price * self.contract_size
         if self.position <= 0:
             self.entry_price = price
         self.position += size
@@ -128,7 +136,7 @@ class Account:
         if size <= 0:
             return
         price = self._cross_price("sell")
-        self.cash += size * price
+        self.cash += size * price * self.contract_size
         self.position -= size
         self.trades += 1
         self._record("sell", size, price, False)
@@ -141,7 +149,7 @@ class Account:
         self.entry_price = 0.0
 
     def _passive_buy(self, price, size, adverse):
-        self.cash -= size * price
+        self.cash -= size * price * self.contract_size
         self.position += size
         self.trades += 1
         self.passive_fills += 1
@@ -149,7 +157,7 @@ class Account:
         self._record("buy", size, float(price), True)
 
     def _passive_sell(self, price, size, adverse):
-        self.cash += size * price
+        self.cash += size * price * self.contract_size
         self.position -= size
         self.trades += 1
         self.passive_fills += 1
@@ -178,8 +186,22 @@ class Account:
         drift = row["price"] - self._prev_price
         noise = row["atr"] * 0.4
         toxic = row["toxic"]
+
+        # Where you sit in the queue decides which fills you get.
+        #
+        # At the touch you are behind the size already resting there, so ordinary
+        # two-way flow trades against the book and not against you. You still get
+        # filled when the market moves through your price — and that is the fill
+        # that hurts, because it leaves you holding the side that just lost.
+        #
+        # Improving on the touch puts you at the front and earns the spread. It also
+        # means every adverse move reaches you first. Charging the spread for that
+        # risk is the whole job; a maker that quotes at the touch and expects to earn
+        # it anyway is exactly the mistake this harness exists to expose.
         marketable_bid = bid_price >= row["bid"]
         marketable_ask = ask_price <= row["ask"]
+        at_front_bid = bid_price > row["bid"]
+        at_front_ask = ask_price < row["ask"]
 
         if toxic > 0:
             # Informed one-way flow only lifts the side that leaves you holding the loser.
@@ -196,10 +218,10 @@ class Account:
             if marketable_ask:
                 self._passive_sell(ask_price, size, adverse=True)
         else:
-            # Two-way flow in a quiet tick: both sides print and you earn the spread.
-            if marketable_bid:
+            # Quiet two-way flow, which only reaches the front of the queue.
+            if at_front_bid:
                 self._passive_buy(bid_price, size, adverse=False)
-            if marketable_ask:
+            if at_front_ask:
                 self._passive_sell(ask_price, size, adverse=False)
 
     def stop_loss_hit(self, distance):
@@ -223,7 +245,7 @@ def load_strategy(code):
 def main():
     payload = json.loads(sys.stdin.read())
     rows = payload["rows"]
-    account = Account()
+    account = Account(payload.get("contract_size", 1.0))
     error = None
     captured = io.StringIO()
     channel = sys.stdout
@@ -252,7 +274,7 @@ def main():
             except Exception as exc:
                 error = {"type": type(exc).__name__, "message": str(exc), "index": row["index"]}
 
-        equity = account.cash + account.position * row["price"]
+        equity = account.cash + account.position * row["price"] * account.contract_size
         account.equity = equity
         ticks.append(
             {

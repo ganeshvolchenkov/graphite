@@ -25,3 +25,35 @@ Thumbs.db
 .tunnel.log
 .tunnel.out.log
 .sse_probe.py
+
+# Secrets / deployment credentials
+.env*
+!.env.example
+*.pem
+*.key
+.vercel/
+.modal.toml
+
+# AI-assistant instructions, skills and notes (docs other than README.md stay local)
+.claude/
+.agents/
+frontend/.agents/
+skills-lock.json
+CLAUDE.md
+AGENTS.md
+*.md
+!README.md
+!/README.md
+frontend/README.md
+
+# Hackathon pitch material
+*.pptx
+create_presentation.py
+
+# Scratch probes, smoke tests and captured outputs
+backend/probe_usage.py
+backend/smoke_test.py
+backend/test_*.py
+!backend/test_robustness.py
+backend/test_script.js
+backend/ecb*.json
